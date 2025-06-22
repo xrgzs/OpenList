@@ -49,6 +49,7 @@ import (
 	_ "github.com/OpenListTeam/OpenList/drivers/openlist"
 	_ "github.com/OpenListTeam/OpenList/drivers/pikpak"
 	_ "github.com/OpenListTeam/OpenList/drivers/pikpak_share"
+	_ "github.com/OpenListTeam/OpenList/drivers/qingque"
 	_ "github.com/OpenListTeam/OpenList/drivers/quark_open"
 	_ "github.com/OpenListTeam/OpenList/drivers/quark_uc"
 	_ "github.com/OpenListTeam/OpenList/drivers/quark_uc_tv"
