@@ -132,6 +132,9 @@ func (d *OpenList) Link(ctx context.Context, file model.Obj, args model.LinkArgs
 	if err != nil {
 		return nil, err
 	}
+	if d.Cdn != "" {
+		resp.Data.RawURL = strings.Replace(resp.Data.RawURL, d.Address, d.Cdn, 1)
+	}
 	return &model.Link{
 		URL: resp.Data.RawURL,
 	}, nil
