@@ -105,7 +105,7 @@ func (d *CloudreveV4) List(ctx context.Context, dir model.Obj, args model.ListAr
 			}
 		}
 		var thumb model.Thumbnail
-		if d.EnableThumb && src.Type == 0 {
+		if d.EnableThumb && src.Type == 0 && (src.Metadata == nil || src.Metadata[MetadataThumbDisabled] == "") {
 			var t FileThumbResp
 			err := d.request(http.MethodGet, "/file/thumb", func(req *resty.Request) {
 				req.SetQueryParam("uri", src.Path)
