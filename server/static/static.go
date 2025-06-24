@@ -85,20 +85,22 @@ func UpdateIndex() {
 func Static(r *gin.RouterGroup, noRoute func(handlers ...gin.HandlerFunc)) {
 	initStatic()
 	initIndex()
-	folders := []string{"assets", "images", "streamer", "static"}
-	r.Use(func(c *gin.Context) {
-		for _, folder := range folders {
-			if strings.HasPrefix(c.Request.RequestURI, fmt.Sprintf("/%s/", folder)) {
-				c.Header("Cache-Control", "public, max-age=15552000")
+	if conf.Conf.Cdn == "" {
+		folders := []string{"assets", "images", "streamer", "static"}
+		r.Use(func(c *gin.Context) {
+			for _, folder := range folders {
+				if strings.HasPrefix(c.Request.RequestURI, fmt.Sprintf("/%s/", folder)) {
+					c.Header("Cache-Control", "public, max-age=15552000")
+				}
 			}
+		})
+		for _, folder := range folders {
+			sub, err := fs.Sub(static, folder)
+			if err != nil {
+				utils.Log.Fatalf("can't find folder: %s", folder)
+			}
+			r.StaticFS(fmt.Sprintf("/%s/", folder), http.FS(sub))
 		}
-	})
-	for _, folder := range folders {
-		sub, err := fs.Sub(static, folder)
-		if err != nil {
-			utils.Log.Fatalf("can't find folder: %s", folder)
-		}
-		r.StaticFS(fmt.Sprintf("/%s/", folder), http.FS(sub))
 	}
 
 	noRoute(func(c *gin.Context) {
