@@ -93,6 +93,12 @@ func (d *CloudreveV4) List(ctx context.Context, dir model.Obj, args model.ListAr
 		params["next_page_token"] = r.Pagination.NextToken
 	}
 
+	if d.HideUploading {
+		f = utils.SliceFilter(f, func(src File) bool {
+			return src.Metadata == nil || src.Metadata[MetadataUploadSessionID] == nil
+		})
+	}
+
 	return utils.SliceConvert(f, func(src File) (model.Obj, error) {
 		if d.EnableFolderSize && src.Type == 1 {
 			var ds FolderSummaryResp
