@@ -104,6 +104,10 @@ N/A（重建中）
 
 一般问题请到 [*Discussions*](https://github.com/OpenListTeam/OpenList/discussions) 讨论，***Issues* 仅针对错误报告和功能请求。**
 
+## 软件包状态
+
+[![Packaging status](https://repology.org/badge/vertical-allrepos/openlist.svg?header=软件包状态&columns=3)](https://repology.org/project/openlist/versions)
+
 ## 贡献者
 
 感谢这些开源作者们：

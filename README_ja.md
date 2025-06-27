@@ -105,6 +105,10 @@ N/A （再構築中）
 
 一般的なご質問は [*Discussions*](https://github.com/OpenListTeam/OpenList/discussions) をご利用ください。***Issues* はバグ報告と機能リクエストに限定されています。**
 
+## パッケージのステータス
+
+[![Packaging status](https://repology.org/badge/vertical-allrepos/openlist.svg?header=パッケージのステータス&columns=3)](https://repology.org/project/openlist/versions)
+
 ## コントリビューター
 
 これらの素晴らしい人々に感謝します:

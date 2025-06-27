@@ -106,6 +106,10 @@ N/A (to be rebuilt)
 
 Please refer to [*Discussions*](https://github.com/OpenListTeam/OpenList/discussions) for raising general questions, ***Issues* is for bug reports and feature requests only.**
 
+# Package status
+
+[![Packaging status](https://repology.org/badge/vertical-allrepos/openlist.svg?columns=3)](https://repology.org/project/openlist/versions)
+
 ## Contributors
 
 Thanks goes to these wonderful people:
