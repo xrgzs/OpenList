@@ -35,18 +35,14 @@ func initIndex() {
 	siteConfig := getSiteConfig()
 	if conf.Conf.DistDir != "" || (conf.Conf.Cdn != "" && (conf.WebVersion == "" || conf.WebVersion == "beta" || conf.WebVersion == "dev")) {
 		// fetch index.html from cdn
-		resp, err := base.HttpClient.Get(fmt.Sprintf("%s/index.html", siteConfig.Cdn))
+		resp, err := base.RestyClient.R().Get(fmt.Sprintf("%s/index.html", siteConfig.Cdn))
 		if err != nil {
 			utils.Log.Fatalf("failed to fetch index.html from CDN: %v", err)
 		}
-		if resp.StatusCode != http.StatusOK {
-			utils.Log.Fatalf("failed to fetch index.html from CDN, status code: %d", resp.StatusCode)
+		if resp.StatusCode() != http.StatusOK {
+			utils.Log.Fatalf("failed to fetch index.html from CDN, status code: %d", resp.StatusCode())
 		}
-		index, err := io.ReadAll(resp.Body)
-		if err != nil {
-			utils.Log.Fatalf("failed to read index.html from CDN: %v", err)
-		}
-		conf.RawIndexHtml = string(index)
+		conf.RawIndexHtml = string(resp.Body())
 	} else {
 		// read index.html from static files system
 		indexFile, err := static.Open("index.html")
