@@ -1,8 +1,8 @@
 package quark_open
 
 import (
-	"github.com/OpenListTeam/OpenList/internal/driver"
-	"github.com/OpenListTeam/OpenList/internal/op"
+	"github.com/OpenListTeam/OpenList/v4/internal/driver"
+	"github.com/OpenListTeam/OpenList/v4/internal/op"
 )
 
 type Addition struct {
@@ -18,8 +18,9 @@ type Addition struct {
 }
 
 type Conf struct {
-	ua  string
-	api string
+	ua     string
+	api    string
+	userId string
 }
 
 func init() {

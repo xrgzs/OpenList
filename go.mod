@@ -1,17 +1,18 @@
-module github.com/OpenListTeam/OpenList
+module github.com/OpenListTeam/OpenList/v4
 
 go 1.23.4
 
 require (
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.17.0
 	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.6.0
-	github.com/OpenListTeam/gofakes3 v0.1.0
+	github.com/OpenListTeam/go-cache v0.1.0
+	github.com/OpenListTeam/rateg v0.1.0
 	github.com/OpenListTeam/sftpd-openlist v1.0.1
+	github.com/OpenListTeam/tache v0.2.0
 	github.com/OpenListTeam/times v0.1.0
+	github.com/OpenListTeam/wopan-sdk-go v0.1.5
 	github.com/ProtonMail/go-crypto v1.0.0
 	github.com/SheltonZhu/115driver v1.0.34
-	github.com/Xhofe/go-cache v0.0.0-20240804043513-b1a71927bc21
-	github.com/Xhofe/rateg v0.0.0-20230728072201-251a4e1adad4
 	github.com/aliyun/aliyun-oss-go-sdk v3.0.2+incompatible
 	github.com/avast/retry-go v3.0.0+incompatible
 	github.com/aws/aws-sdk-go v1.55.5
@@ -27,7 +28,7 @@ require (
 	github.com/disintegration/imaging v1.6.2
 	github.com/dlclark/regexp2 v1.11.4
 	github.com/dustinxie/ecc v0.0.0-20210511000915-959544187564
-	github.com/fclairamb/ftpserverlib v0.26.1-0.20250611192536-99cb646d0bbe
+	github.com/fclairamb/ftpserverlib v0.26.1-0.20250615212502-7accbe1c7aad
 	github.com/foxxorcat/mopan-sdk-go v0.1.6
 	github.com/foxxorcat/weiyun-sdk-go v0.1.3
 	github.com/gin-contrib/cors v1.7.2
@@ -40,13 +41,13 @@ require (
 	github.com/hekmon/transmissionrpc/v3 v3.0.0
 	github.com/hirochachacha/go-smb2 v1.1.0
 	github.com/ipfs/go-ipfs-api v0.7.0
+	github.com/itsHenry35/gofakes3 v0.0.8
 	github.com/jlaffaye/ftp v0.2.0
 	github.com/json-iterator/go v1.1.12
 	github.com/kdomanski/iso9660 v0.4.0
 	github.com/maruel/natural v1.1.1
 	github.com/meilisearch/meilisearch-go v0.27.2
 	github.com/mholt/archives v0.1.0
-	github.com/minio/sio v0.4.0
 	github.com/natefinch/lumberjack v2.0.0+incompatible
 	github.com/ncw/swift/v2 v2.0.3
 	github.com/pkg/errors v0.9.1
@@ -58,14 +59,12 @@ require (
 	github.com/spf13/afero v1.14.0
 	github.com/spf13/cobra v1.8.1
 	github.com/stretchr/testify v1.10.0
-	github.com/t3rm1n4l/go-mega v0.0.0-20240219080617-d494b6a8ace7
+	github.com/t3rm1n4l/go-mega v0.0.0-20241213151442-a19cff0ec7b5
 	github.com/u2takey/ffmpeg-go v0.5.0
 	github.com/upyun/go-sdk/v3 v3.0.4
 	github.com/winfsp/cgofuse v1.5.1-0.20230130140708-f87f5db493b5
-	github.com/xhofe/tache v0.1.5
-	github.com/xhofe/wopan-sdk-go v0.1.3
 	github.com/yeka/zip v0.0.0-20231116150916-03d6312748a9
-	github.com/zzzhr1990/go-common-entity v0.0.0-20221216044934-fd1c571e3a22
+	github.com/zzzhr1990/go-common-entity v0.0.0-20250202070650-1a200048f0d3
 	golang.org/x/crypto v0.36.0
 	golang.org/x/exp v0.0.0-20240904232852-e7e105dedf7e
 	golang.org/x/image v0.19.0
@@ -80,9 +79,15 @@ require (
 	gorm.io/gorm v1.25.11
 )
 
-require github.com/Azure/azure-sdk-for-go/sdk/internal v1.10.0 // indirect
+require (
+	cloud.google.com/go/compute/metadata v0.7.0 // indirect
+	github.com/Azure/azure-sdk-for-go/sdk/internal v1.10.0 // indirect
+	github.com/google/go-cmp v0.7.0 // indirect
+	github.com/minio/xxml v0.0.3 // indirect
+)
 
 require (
+	github.com/OpenListTeam/115-sdk-go v0.2.0
 	github.com/STARRY-S/zip v0.2.1 // indirect
 	github.com/aymerick/douceur v0.2.0 // indirect
 	github.com/blevesearch/go-faiss v1.0.20 // indirect
@@ -106,7 +111,6 @@ require (
 	github.com/ipfs/boxo v0.12.0 // indirect
 	github.com/jackc/puddle/v2 v2.2.1 // indirect
 	github.com/klauspost/pgzip v1.2.6 // indirect
-	github.com/kr/text v0.2.0 // indirect
 	github.com/matoous/go-nanoid/v2 v2.1.0 // indirect
 	github.com/microcosm-cc/bluemonday v1.0.27
 	github.com/nwaples/rardecode/v2 v2.0.0-beta.4.0.20241112120701-034e449c6e78
@@ -114,7 +118,6 @@ require (
 	github.com/taruti/bytepool v0.0.0-20160310082835-5e3a9ea56543 // indirect
 	github.com/therootcompany/xz v1.0.1 // indirect
 	github.com/ulikunitz/xz v0.5.12 // indirect
-	github.com/xhofe/115-sdk-go v0.1.5
 	github.com/yuin/goldmark v1.7.8
 	go4.org v0.0.0-20230225012048-214862532bf5
 	resty.dev/v3 v3.0.0-beta.2 // indirect
@@ -122,6 +125,7 @@ require (
 
 require (
 	github.com/Max-Sum/base32768 v0.0.0-20230304063302-18e6ce5945fd // indirect
+	github.com/OpenListTeam/gsync v0.1.0 // indirect
 	github.com/RoaringBitmap/roaring v1.9.3 // indirect
 	github.com/abbot/go-http-auth v0.4.0 // indirect
 	github.com/aead/ecdh v0.2.0 // indirect
@@ -234,7 +238,7 @@ require (
 	github.com/shabbyrobe/gocovmerge v0.0.0-20230507112040-c3350d9342df // indirect
 	github.com/shirou/gopsutil/v3 v3.24.4 // indirect
 	github.com/shoenig/go-m1cpu v0.1.6 // indirect
-	github.com/skip2/go-qrcode v0.0.0-20200617195104-da1b6568686e // indirect
+	github.com/skip2/go-qrcode v0.0.0-20200617195104-da1b6568686e
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/tklauser/go-sysconf v0.3.13 // indirect
@@ -245,11 +249,10 @@ require (
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasthttp v1.37.1-0.20220607072126-8a320890c08d // indirect
 	github.com/x448/float16 v0.8.4 // indirect
-	github.com/xhofe/gsync v0.0.0-20230917091818-2111ceb38a25 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	go.etcd.io/bbolt v1.3.8 // indirect
 	golang.org/x/arch v0.8.0 // indirect
-	golang.org/x/sync v0.12.0
+	golang.org/x/sync v0.12.0 // indirect
 	golang.org/x/sys v0.33.0 // indirect
 	golang.org/x/term v0.32.0 // indirect
 	golang.org/x/text v0.23.0
@@ -265,4 +268,4 @@ require (
 	lukechampine.com/blake3 v1.1.7 // indirect
 )
 
-// replace github.com/xhofe/115-sdk-go => ../../xhofe/115-sdk-go
+// replace github.com/OpenListTeam/115-sdk-go => ../../OpenListTeam/115-sdk-go

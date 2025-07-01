@@ -11,9 +11,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/OpenListTeam/OpenList/pkg/utils"
+	"github.com/OpenListTeam/OpenList/v4/pkg/utils"
 
-	"github.com/OpenListTeam/OpenList/pkg/http_range"
+	"github.com/OpenListTeam/OpenList/v4/pkg/http_range"
 	"github.com/aws/aws-sdk-go/aws/awsutil"
 	log "github.com/sirupsen/logrus"
 )
@@ -156,7 +156,6 @@ func (d *downloader) download() (io.ReadCloser, error) {
 	if err := d.concurrencyCheck(); err != nil {
 		return nil, err
 	}
-	d.ctx, d.cancel = context.WithCancelCause(d.ctx)
 
 	maxPart := int(d.params.Range.Length / int64(d.cfg.PartSize))
 	if d.params.Range.Length%int64(d.cfg.PartSize) > 0 {
@@ -171,19 +170,27 @@ func (d *downloader) download() (io.ReadCloser, error) {
 
 	log.Debugf("cfgConcurrency:%d", d.cfg.Concurrency)
 
-	if d.cfg.Concurrency == 1 {
-		if d.cfg.ConcurrencyLimit != nil {
-			go func() {
-				<-d.ctx.Done()
-				d.concurrencyFinish()
-			}()
-		}
+	if maxPart == 1 {
 		resp, err := d.cfg.HttpClient(d.ctx, d.params)
 		if err != nil {
+			d.concurrencyFinish()
 			return nil, err
 		}
+		closeFunc := resp.Body.Close
+		resp.Body = utils.NewReadCloser(resp.Body, func() error {
+			d.m.Lock()
+			defer d.m.Unlock()
+			if closeFunc != nil {
+				d.concurrencyFinish()
+				err := closeFunc()
+				closeFunc = nil
+				return err
+			}
+			return nil
+		})
 		return resp.Body, nil
 	}
+	d.ctx, d.cancel = context.WithCancelCause(d.ctx)
 
 	// workers
 	d.chunkChannel = make(chan chunk, d.cfg.Concurrency)
@@ -619,6 +626,9 @@ type Buf struct {
 	ctx    context.Context
 	off    int
 	rw     sync.Mutex
+
+	readSignal  chan struct{}
+	readPending bool
 }
 
 // NewBuf is a buffer that can have 1 read & 1 write at the same time.
@@ -628,9 +638,16 @@ func NewBuf(ctx context.Context, maxSize int) *Buf {
 		ctx:    ctx,
 		buffer: bytes.NewBuffer(make([]byte, 0, maxSize)),
 		size:   maxSize,
+
+		readSignal: make(chan struct{}, 1),
 	}
 }
 func (br *Buf) Reset(size int) {
+	br.rw.Lock()
+	defer br.rw.Unlock()
+	if br.buffer == nil {
+		return
+	}
 	br.buffer.Reset()
 	br.size = size
 	br.off = 0
@@ -646,27 +663,34 @@ func (br *Buf) Read(p []byte) (n int, err error) {
 	if br.off >= br.size {
 		return 0, io.EOF
 	}
-	br.rw.Lock()
-	n, err = br.buffer.Read(p)
-	br.rw.Unlock()
-	if err == nil {
-		br.off += n
-		return n, err
-	}
-	if err != io.EOF {
-		return n, err
-	}
-	if n != 0 {
-		br.off += n
-		return n, nil
-	}
-	// n==0, err==io.EOF
-	// wait for new write for 200ms
-	select {
-	case <-br.ctx.Done():
-		return 0, br.ctx.Err()
-	case <-time.After(time.Millisecond * 200):
-		return 0, nil
+	for {
+		br.rw.Lock()
+		if br.buffer != nil {
+			n, err = br.buffer.Read(p)
+		} else {
+			err = io.ErrClosedPipe
+		}
+		if err != nil && err != io.EOF {
+			br.rw.Unlock()
+			return
+		}
+		if n > 0 {
+			br.off += n
+			br.rw.Unlock()
+			return n, nil
+		}
+		br.readPending = true
+		br.rw.Unlock()
+		// n==0, err==io.EOF
+		select {
+		case <-br.ctx.Done():
+			return 0, br.ctx.Err()
+		case _, ok := <-br.readSignal:
+			if !ok {
+				return 0, io.ErrClosedPipe
+			}
+			continue
+		}
 	}
 }
 
@@ -676,10 +700,23 @@ func (br *Buf) Write(p []byte) (n int, err error) {
 	}
 	br.rw.Lock()
 	defer br.rw.Unlock()
+	if br.buffer == nil {
+		return 0, io.ErrClosedPipe
+	}
 	n, err = br.buffer.Write(p)
+	if br.readPending {
+		br.readPending = false
+		select {
+		case br.readSignal <- struct{}{}:
+		default:
+		}
+	}
 	return
 }
 
 func (br *Buf) Close() {
+	br.rw.Lock()
+	defer br.rw.Unlock()
 	br.buffer = nil
+	close(br.readSignal)
 }

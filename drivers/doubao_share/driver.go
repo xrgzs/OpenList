@@ -5,10 +5,11 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/OpenListTeam/OpenList/drivers/base"
-	"github.com/OpenListTeam/OpenList/internal/driver"
-	"github.com/OpenListTeam/OpenList/internal/errs"
-	"github.com/OpenListTeam/OpenList/internal/model"
+	"github.com/OpenListTeam/OpenList/v4/drivers/base"
+	"github.com/OpenListTeam/OpenList/v4/internal/driver"
+	"github.com/OpenListTeam/OpenList/v4/internal/errs"
+	"github.com/OpenListTeam/OpenList/v4/internal/model"
+	"github.com/OpenListTeam/OpenList/v4/pkg/utils"
 	"github.com/go-resty/resty/v2"
 )
 
@@ -105,7 +106,7 @@ func (d *DoubaoShare) Link(ctx context.Context, file model.Obj, args model.LinkA
 		}
 
 		// 生成标准的Content-Disposition
-		contentDisposition := generateContentDisposition(u.Name)
+		contentDisposition := utils.GenerateContentDisposition(u.Name)
 
 		return &model.Link{
 			URL: downloadUrl,

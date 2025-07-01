@@ -4,11 +4,15 @@ builtAt="$(date +'%F %T %z')"
 gitAuthor="The OpenList Projects Contributors <noreply@openlist.team>"
 gitCommit=$(git log --pretty=format:"%h" -1)
 
-githubAuthHeader=""
-githubAuthValue=""
+githubAuthArgs=""
 if [ -n "$GITHUB_TOKEN" ]; then
-  githubAuthHeader="--header"
-  githubAuthValue="Authorization: Bearer $GITHUB_TOKEN"
+  githubAuthArgs="--header \"Authorization: Bearer $GITHUB_TOKEN\""
+fi
+
+# Check for lite parameter
+useLite=false
+if [[ "$*" == *"lite"* ]]; then
+  useLite=true
 fi
 
 if [ "$1" = "dev" ]; then
@@ -21,11 +25,16 @@ else
   git tag -d beta || true
   # Always true if there's no tag
   version=$(git describe --abbrev=0 --tags 2>/dev/null || echo "v0.0.0")
-  webVersion=$(curl -fsSL --max-time 2 $githubAuthHeader $githubAuthValue "https://api.github.com/repos/OpenListTeam/OpenList-Frontend/releases/latest" | grep "tag_name" | head -n 1 | awk -F ":" '{print $2}' | sed 's/\"//g;s/,//g;s/ //g')
+  webVersion=$(eval "curl -fsSL --max-time 2 $githubAuthArgs \"https://api.github.com/repos/OpenListTeam/OpenList-Frontend/releases/latest\"" | grep "tag_name" | head -n 1 | awk -F ":" '{print $2}' | sed 's/\"//g;s/,//g;s/ //g')
 fi
 
 echo "backend version: $version"
 echo "frontend version: $webVersion"
+if [ "$useLite" = true ]; then
+  echo "using lite frontend"
+else
+  echo "using standard frontend"
+fi
 
 ldflags="\
 -w -s \
@@ -37,15 +46,21 @@ ldflags="\
 "
 
 FetchWebDev() {
-  pre_release_tag=$(curl -fsSL --max-time 2 $githubAuthHeader $githubAuthValue https://api.github.com/repos/OpenListTeam/OpenList-Frontend/releases | jq -r 'map(select(.prerelease)) | first | .tag_name')
+  pre_release_tag=$(eval "curl -fsSL --max-time 2 $githubAuthArgs https://api.github.com/repos/OpenListTeam/OpenList-Frontend/releases" | jq -r 'map(select(.prerelease)) | first | .tag_name')
   if [ -z "$pre_release_tag" ] || [ "$pre_release_tag" == "null" ]; then
     # fall back to latest release
-    pre_release_json=$(curl -fsSL --max-time 2 $githubAuthHeader $githubAuthValue -H "Accept: application/vnd.github.v3+json" "https://api.github.com/repos/OpenListTeam/OpenList-Frontend/releases/latest")
+    pre_release_json=$(eval "curl -fsSL --max-time 2 $githubAuthArgs -H \"Accept: application/vnd.github.v3+json\" \"https://api.github.com/repos/OpenListTeam/OpenList-Frontend/releases/latest\"")
   else
-    pre_release_json=$(curl -fsSL --max-time 2 $githubAuthHeader $githubAuthValue -H "Accept: application/vnd.github.v3+json" "https://api.github.com/repos/OpenListTeam/OpenList-Frontend/releases/tags/$pre_release_tag")
+    pre_release_json=$(eval "curl -fsSL --max-time 2 $githubAuthArgs -H \"Accept: application/vnd.github.v3+json\" \"https://api.github.com/repos/OpenListTeam/OpenList-Frontend/releases/tags/$pre_release_tag\"")
   fi
   pre_release_assets=$(echo "$pre_release_json" | jq -r '.assets[].browser_download_url')
-  pre_release_tar_url=$(echo "$pre_release_assets" | grep "openlist-frontend-dist" | grep "\.tar\.gz$")
+  
+  if [ "$useLite" = true ]; then
+    pre_release_tar_url=$(echo "$pre_release_assets" | grep "openlist-frontend-dist-lite" | grep "\.tar\.gz$")
+  else
+    pre_release_tar_url=$(echo "$pre_release_assets" | grep "openlist-frontend-dist" | grep -v "lite" | grep "\.tar\.gz$")
+  fi
+  
   curl -fsSL "$pre_release_tar_url" -o web-dist-dev.tar.gz
   rm -rf public/dist && mkdir -p public/dist
   tar -zxvf web-dist-dev.tar.gz -C public/dist
@@ -53,9 +68,15 @@ FetchWebDev() {
 }
 
 FetchWebRelease() {
-  release_json=$(curl -fsSL --max-time 2 $githubAuthHeader $githubAuthValue -H "Accept: application/vnd.github.v3+json" "https://api.github.com/repos/OpenListTeam/OpenList-Frontend/releases/latest")
+  release_json=$(eval "curl -fsSL --max-time 2 $githubAuthArgs -H \"Accept: application/vnd.github.v3+json\" \"https://api.github.com/repos/OpenListTeam/OpenList-Frontend/releases/latest\"")
   release_assets=$(echo "$release_json" | jq -r '.assets[].browser_download_url')
-  release_tar_url=$(echo "$release_assets" | grep "openlist-frontend-dist" | grep "\.tar\.gz$")
+  
+  if [ "$useLite" = true ]; then
+    release_tar_url=$(echo "$release_assets" | grep "openlist-frontend-dist-lite" | grep "\.tar\.gz$")
+  else
+    release_tar_url=$(echo "$release_assets" | grep "openlist-frontend-dist" | grep -v "lite" | grep "\.tar\.gz$")
+  fi
+  
   curl -fsSL "$release_tar_url" -o dist.tar.gz
   rm -rf public/dist && mkdir -p public/dist
   tar -zxvf dist.tar.gz -C public/dist
@@ -254,7 +275,7 @@ BuildReleaseFreeBSD() {
   mkdir -p "build/freebsd"
   
   # Get latest FreeBSD 14.x release version from GitHub 
-  freebsd_version=$(curl -fsSL --max-time 2 $githubAuthHeader $githubAuthValue "https://api.github.com/repos/freebsd/freebsd-src/tags" | \
+  freebsd_version=$(eval "curl -fsSL --max-time 2 $githubAuthArgs \"https://api.github.com/repos/freebsd/freebsd-src/tags\"" | \
     jq -r '.[].name' | \
     grep '^release/14\.' | \
     sort -V | \
@@ -295,82 +316,171 @@ MakeRelease() {
     rm -rv compress
   fi
   mkdir compress
+  
+  # Add -lite suffix if useLite is true
+  liteSuffix=""
+  if [ "$useLite" = true ]; then
+    liteSuffix="-lite"
+  fi
+  
   for i in $(find . -type f -name "$appName-linux-*"); do
     cp "$i" "$appName"
-    tar -czvf compress/"$i".tar.gz "$appName"
+    tar -czvf compress/"$i$liteSuffix".tar.gz "$appName"
     rm -f "$appName"
   done
     for i in $(find . -type f -name "$appName-android-*"); do
     cp "$i" "$appName"
-    tar -czvf compress/"$i".tar.gz "$appName"
+    tar -czvf compress/"$i$liteSuffix".tar.gz "$appName"
     rm -f "$appName"
   done
   for i in $(find . -type f -name "$appName-darwin-*"); do
     cp "$i" "$appName"
-    tar -czvf compress/"$i".tar.gz "$appName"
+    tar -czvf compress/"$i$liteSuffix".tar.gz "$appName"
     rm -f "$appName"
   done
   for i in $(find . -type f -name "$appName-freebsd-*"); do
     cp "$i" "$appName"
-    tar -czvf compress/"$i".tar.gz "$appName"
+    tar -czvf compress/"$i$liteSuffix".tar.gz "$appName"
     rm -f "$appName"
   done
   for i in $(find . -type f -name "$appName-windows-*"); do
     cp "$i" "$appName".exe
-    zip compress/$(echo $i | sed 's/\.[^.]*$//').zip "$appName".exe
+    zip compress/$(echo $i | sed 's/\.[^.]*$//')$liteSuffix.zip "$appName".exe
     rm -f "$appName".exe
   done
   cd compress
-  find . -type f -print0 | xargs -0 md5sum >"$1"
-  cat "$1"
+  
+  # Handle MD5 filename - add -lite suffix only if not already present
+  md5FileName="$1"
+  if [ "$useLite" = true ] && [[ "$1" != *"-lite.txt" ]]; then
+    md5FileName=$(echo "$1" | sed 's/\.txt$/-lite.txt/')
+  fi
+  
+  find . -type f -print0 | xargs -0 md5sum >"$md5FileName"
+  cat "$md5FileName"
   cd ../..
 }
 
-if [ "$1" = "dev" ]; then
+# Parse parameters to handle lite parameter position flexibility
+buildType=""
+dockerType=""
+otherParam=""
+
+for arg in "$@"; do
+  case $arg in
+    dev|beta|release|zip|prepare)
+      if [ -z "$buildType" ]; then
+        buildType="$arg"
+      fi
+      ;;
+    docker|docker-multiplatform|linux_musl_arm|linux_musl|android|freebsd|web)
+      if [ -z "$dockerType" ]; then
+        dockerType="$arg"
+      fi
+      ;;
+    lite)
+      # lite parameter is already handled above
+      ;;
+    *)
+      if [ -z "$otherParam" ]; then
+        otherParam="$arg"
+      fi
+      ;;
+  esac
+done
+
+if [ "$buildType" = "dev" ]; then
   FetchWebDev
-  if [ "$2" = "docker" ]; then
+  if [ "$dockerType" = "docker" ]; then
     BuildDocker
-  elif [ "$2" = "docker-multiplatform" ]; then
+  elif [ "$dockerType" = "docker-multiplatform" ]; then
       BuildDockerMultiplatform
-  elif [ "$2" = "web" ]; then
+  elif [ "$dockerType" = "web" ]; then
     echo "web only"
   else
     BuildDev
   fi
-elif [ "$1" = "release" -o "$1" = "beta" ]; then
-  if [ "$1" = "beta" ]; then
+elif [ "$buildType" = "release" -o "$buildType" = "beta" ]; then
+  if [ "$buildType" = "beta" ]; then
     FetchWebDev
   else
     FetchWebRelease
   fi
-  if [ "$2" = "docker" ]; then
+  if [ "$dockerType" = "docker" ]; then
     BuildDocker
-  elif [ "$2" = "docker-multiplatform" ]; then
+  elif [ "$dockerType" = "docker-multiplatform" ]; then
     BuildDockerMultiplatform
-  elif [ "$2" = "linux_musl_arm" ]; then
+  elif [ "$dockerType" = "linux_musl_arm" ]; then
     BuildReleaseLinuxMuslArm
-    MakeRelease "md5-linux-musl-arm.txt"
-  elif [ "$2" = "linux_musl" ]; then
+    if [ "$useLite" = true ]; then
+      MakeRelease "md5-linux-musl-arm-lite.txt"
+    else
+      MakeRelease "md5-linux-musl-arm.txt"
+    fi
+  elif [ "$dockerType" = "linux_musl" ]; then
     BuildReleaseLinuxMusl
-    MakeRelease "md5-linux-musl.txt"
-  elif [ "$2" = "android" ]; then
+    if [ "$useLite" = true ]; then
+      MakeRelease "md5-linux-musl-lite.txt"
+    else
+      MakeRelease "md5-linux-musl.txt"
+    fi
+  elif [ "$dockerType" = "android" ]; then
     BuildReleaseAndroid
-    MakeRelease "md5-android.txt"
-  elif [ "$2" = "freebsd" ]; then
+    if [ "$useLite" = true ]; then
+      MakeRelease "md5-android-lite.txt"
+    else
+      MakeRelease "md5-android.txt"
+    fi
+  elif [ "$dockerType" = "freebsd" ]; then
     BuildReleaseFreeBSD
-    MakeRelease "md5-freebsd.txt"
-  elif [ "$2" = "web" ]; then
+    if [ "$useLite" = true ]; then
+      MakeRelease "md5-freebsd-lite.txt"
+    else
+      MakeRelease "md5-freebsd.txt"
+    fi
+  elif [ "$dockerType" = "web" ]; then
     echo "web only"
   else
     BuildRelease
-    MakeRelease "md5.txt"
+    if [ "$useLite" = true ]; then
+      MakeRelease "md5-lite.txt"
+    else
+      MakeRelease "md5.txt"
+    fi
   fi
-elif [ "$1" = "prepare" ]; then
-  if [ "$2" = "docker-multiplatform" ]; then
+elif [ "$buildType" = "prepare" ]; then
+  if [ "$dockerType" = "docker-multiplatform" ]; then
     PrepareBuildDockerMusl
   fi
-elif [ "$1" = "zip" ]; then
-  MakeRelease "$2".txt
+elif [ "$buildType" = "zip" ]; then
+  if [ -n "$otherParam" ]; then
+    if [ "$useLite" = true ]; then
+      MakeRelease "$otherParam-lite.txt"
+    else
+      MakeRelease "$otherParam.txt"
+    fi
+  elif [ -n "$dockerType" ]; then
+    if [ "$useLite" = true ]; then
+      MakeRelease "$dockerType-lite.txt"
+    else
+      MakeRelease "$dockerType.txt"
+    fi
+  else
+    if [ "$useLite" = true ]; then
+      MakeRelease "md5-lite.txt"
+    else
+      MakeRelease "md5.txt"
+    fi
+  fi
 else
   echo -e "Parameter error"
+  echo -e "Usage: $0 {dev|beta|release|zip|prepare} [docker|docker-multiplatform|linux_musl_arm|linux_musl|android|freebsd|web] [lite] [other_params]"
+  echo -e "Examples:"
+  echo -e "  $0 dev"
+  echo -e "  $0 dev lite"
+  echo -e "  $0 dev docker"
+  echo -e "  $0 dev docker lite"
+  echo -e "  $0 release"
+  echo -e "  $0 release lite"
+  echo -e "  $0 release docker lite"
 fi

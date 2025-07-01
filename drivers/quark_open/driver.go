@@ -6,12 +6,12 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/OpenListTeam/OpenList/drivers/base"
-	"github.com/OpenListTeam/OpenList/internal/driver"
-	"github.com/OpenListTeam/OpenList/internal/errs"
-	"github.com/OpenListTeam/OpenList/internal/model"
-	streamPkg "github.com/OpenListTeam/OpenList/internal/stream"
-	"github.com/OpenListTeam/OpenList/pkg/utils"
+	"github.com/OpenListTeam/OpenList/v4/drivers/base"
+	"github.com/OpenListTeam/OpenList/v4/internal/driver"
+	"github.com/OpenListTeam/OpenList/v4/internal/errs"
+	"github.com/OpenListTeam/OpenList/v4/internal/model"
+	streamPkg "github.com/OpenListTeam/OpenList/v4/internal/stream"
+	"github.com/OpenListTeam/OpenList/v4/pkg/utils"
 	"github.com/go-resty/resty/v2"
 	"hash"
 	"io"
@@ -34,7 +34,19 @@ func (d *QuarkOpen) GetAddition() driver.Additional {
 }
 
 func (d *QuarkOpen) Init(ctx context.Context) error {
-	_, err := d.request(ctx, "/open/v1/user/info", http.MethodGet, nil, nil)
+	var resp UserInfoResp
+
+	_, err := d.request(ctx, "/open/v1/user/info", http.MethodGet, nil, &resp)
+	if err != nil {
+		return err
+	}
+
+	if resp.Data.UserID != "" {
+		d.conf.userId = resp.Data.UserID
+	} else {
+		return errors.New("failed to get user ID")
+	}
+
 	return err
 }
 
@@ -161,6 +173,12 @@ func (d *QuarkOpen) Put(ctx context.Context, dstDir model.Obj, stream model.File
 	if err != nil {
 		return err
 	}
+	// 如果预上传已经完成，直接返回--秒传
+	if pre.Data.Finish == true {
+		up(100)
+		return nil
+	}
+
 	// get part info
 	partInfo := d._getPartInfo(stream, pre.Data.PartSize)
 	// get upload url info

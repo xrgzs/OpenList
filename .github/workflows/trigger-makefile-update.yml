@@ -1,0 +1,40 @@
+name: Trigger OpenWRT Update
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to trigger update for'
+        required: true
+        type: string
+
+jobs:
+  trigger-makefile-update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Makefile hash update
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.EXTERNAL_REPO_TOKEN_LUCI_APP_OPENLIST }}
+          repository: ${{ vars.HOOK_REPO || 'OpenListTeam/luci-app-openlist' }}
+          event-type: update-hashes
+          client-payload: |
+            {
+              "source_repository": "${{ github.repository }}",
+              "release_tag": "${{ inputs.tag || github.ref_name }}",
+              "release_name": "${{ inputs.tag || github.ref_name }}",
+              "release_url": "${{ github.server_url }}/${{ github.repository }}/releases/tag/${{ inputs.tag || github.ref_name }}",
+              "triggered_by": "${{ github.actor }}",
+              "trigger_reason": "${{ github.event_name }}"
+            }
+
+      - name: Log trigger information
+        run: |
+          echo "🚀 Successfully triggered Makefile hash update"
+          echo "📦 Target repository: OpenListTeam/luci-app-openlist"
+          echo "🏷️ Tag: ${{ inputs.tag || github.ref_name }}"
+          echo "👤 Triggered by: ${{ github.actor }}"
+          echo "📅 Trigger time: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
