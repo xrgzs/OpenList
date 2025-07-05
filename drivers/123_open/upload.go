@@ -98,7 +98,7 @@ func (d *Open123) Upload(ctx context.Context, file model.FileStreamer, createRes
 		partNumber := partIndex + 1 // 分片号从1开始
 		offset := partIndex * chunkSize
 		size := min(chunkSize, size-offset)
-		var reader io.ReadSeeker
+		var reader *stream.SectionReader
 		var rateLimitedRd io.Reader
 		threadG.GoWithResult(func(ctx context.Context) error {
 			if reader == nil {
@@ -132,9 +132,7 @@ func (d *Open123) Upload(ctx context.Context, file model.FileStreamer, createRes
 			up(progress)
 			return nil
 		}, func(err error) {
-			if reader != nil {
-				ss.RecycleSectionReader(reader)
-			}
+			ss.RecycleSectionReader(reader)
 		})
 	}
 

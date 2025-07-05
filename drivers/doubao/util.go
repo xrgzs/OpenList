@@ -24,6 +24,7 @@ import (
 	"github.com/OpenListTeam/OpenList/v4/drivers/base"
 	"github.com/OpenListTeam/OpenList/v4/internal/driver"
 	"github.com/OpenListTeam/OpenList/v4/internal/model"
+	"github.com/OpenListTeam/OpenList/v4/internal/stream"
 	"github.com/OpenListTeam/OpenList/v4/pkg/errgroup"
 	"github.com/OpenListTeam/OpenList/v4/pkg/utils"
 	"github.com/avast/retry-go"
@@ -519,57 +520,84 @@ func (d *Doubao) UploadByMultipart(ctx context.Context, config *UploadConfig, fi
 	totalParts := (fileSize + chunkSize - 1) / chunkSize
 	// 创建分片信息组
 	parts := make([]UploadPart, totalParts)
-	// 缓存文件
-	tempFile, err := file.CacheFullInTempFile()
+
+	// 用 stream.NewStreamSectionReader 替代缓存临时文件
+	ss, err := stream.NewStreamSectionReader(file, int(chunkSize))
 	if err != nil {
-		return nil, fmt.Errorf("failed to cache file: %w", err)
+		return nil, fmt.Errorf("failed to create section reader: %w", err)
 	}
 	up(10.0) // 更新进度
 	// 设置并行上传
-	threadG, uploadCtx := errgroup.NewGroupWithContext(ctx, d.uploadThread,
-		retry.Attempts(1),
+	thread := min(int(totalParts), d.uploadThread)
+	threadG, uploadCtx := errgroup.NewGroupWithContext(ctx, thread,
+		retry.Attempts(3),
 		retry.Delay(time.Second),
 		retry.DelayType(retry.BackOffDelay))
 
 	var partsMutex sync.Mutex
 	// 并行上传所有分片
-	for partIndex := int64(0); partIndex < totalParts; partIndex++ {
+	for partIndex := range totalParts {
 		if utils.IsCanceled(uploadCtx) {
 			break
 		}
-		partIndex := partIndex
 		partNumber := partIndex + 1 // 分片编号从1开始
 
-		threadG.Go(func(ctx context.Context) error {
-			// 计算此分片的大小和偏移
-			offset := partIndex * chunkSize
-			size := chunkSize
-			if partIndex == totalParts-1 {
-				size = fileSize - offset
-			}
+		// 计算此分片的大小和偏移
+		offset := partIndex * chunkSize
+		size := chunkSize
+		if partIndex == totalParts-1 {
+			size = fileSize - offset
+		}
 
-			limitedReader := driver.NewLimitedUploadStream(ctx, io.NewSectionReader(tempFile, offset, size))
-			// 读取数据到内存
-			data, err := io.ReadAll(limitedReader)
-			if err != nil {
-				return fmt.Errorf("failed to read part %d: %w", partNumber, err)
-			}
-			// 计算CRC32
-			crc32Value := calculateCRC32(data)
-			// 使用_retryOperation上传分片
-			var uploadPart UploadPart
-			if err = d._retryOperation(fmt.Sprintf("Upload part %d", partNumber), func() error {
+		var reader *stream.SectionReader
+		var rateLimitedRd io.Reader
+		threadG.GoWithResult(func(ctx context.Context) error {
+			if reader == nil {
 				var err error
-				uploadPart, err = d.uploadPart(config, uploadUrl, uploadID, partNumber, data, crc32Value)
+				reader, err = ss.GetSectionReader(offset, size)
+				if err != nil {
+					return err
+				}
+				rateLimitedRd = driver.NewLimitedUploadStream(ctx, reader)
+			}
+			reader.Seek(0, io.SeekStart)
+			// 计算CRC32
+			crc32Value := calculateCRC32(reader)
+			// 使用_retryOperation上传分片
+			reader.Seek(0, io.SeekStart)
+			req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s?uploadid=%s&part_number=%d&phase=transfer", uploadUrl, uploadID, partNumber), rateLimitedRd)
+			if err != nil {
 				return err
-			}); err != nil {
-				return fmt.Errorf("part %d upload failed: %w", partNumber, err)
+			}
+			req.Header = map[string][]string{
+				"Referer":             {BaseURL + "/"},
+				"Origin":              {BaseURL},
+				"User-Agent":          {UserAgent},
+				"X-Storage-U":         {d.UserId},
+				"Authorization":       {storeInfo.Auth},
+				"Content-Type":        {"application/octet-stream"},
+				"Content-Crc32":       {crc32Value},
+				"Content-Length":      {fmt.Sprintf("%d", size)},
+				"Content-Disposition": {fmt.Sprintf("attachment; filename=%s", url.QueryEscape(storeInfo.StoreURI))},
+			}
+			res, err := base.HttpClient.Do(req)
+			if err != nil {
+				return err
+			}
+			defer res.Body.Close()
+			bytes, _ := io.ReadAll(res.Body)
+			uploadResp := UploadResp{}
+			utils.Json.Unmarshal(bytes, &uploadResp)
+			if uploadResp.Code != 2000 {
+				return fmt.Errorf("upload part failed: %s", uploadResp.Message)
+			} else if uploadResp.Data.Crc32 != crc32Value {
+				return fmt.Errorf("upload part failed: crc32 mismatch, expected %s, got %s", crc32Value, uploadResp.Data.Crc32)
 			}
 			// 记录成功上传的分片
 			partsMutex.Lock()
 			parts[partIndex] = UploadPart{
 				PartNumber: strconv.FormatInt(partNumber, 10),
-				Etag:       uploadPart.Etag,
+				Etag:       uploadResp.Data.Etag,
 				Crc32:      crc32Value,
 			}
 			partsMutex.Unlock()
@@ -578,6 +606,8 @@ func (d *Doubao) UploadByMultipart(ctx context.Context, config *UploadConfig, fi
 			up(math.Min(progress, 95.0))
 
 			return nil
+		}, func(err error) {
+			ss.RecycleSectionReader(reader)
 		})
 	}
 
@@ -785,9 +815,9 @@ func (d *Doubao) commitMultipartUpload(uploadConfig *UploadConfig) error {
 }
 
 // 计算CRC32
-func calculateCRC32(data []byte) string {
+func calculateCRC32(rs io.Reader) string {
 	hash := crc32.NewIEEE()
-	hash.Write(data)
+	utils.CopyWithBuffer(hash, rs)
 	return hex.EncodeToString(hash.Sum(nil))
 }
 

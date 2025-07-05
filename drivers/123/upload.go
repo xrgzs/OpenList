@@ -122,7 +122,7 @@ func (d *Pan123) newUpload(ctx context.Context, upReq *UploadResp, file model.Fi
 			if cur == chunkCount {
 				curSize = lastChunkSize
 			}
-			var reader io.ReadSeeker
+			var reader *stream.SectionReader
 			var rateLimitedRd io.Reader
 			threadG.GoWithResult(func(ctx context.Context) error {
 				if reader == nil {
