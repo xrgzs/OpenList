@@ -223,6 +223,10 @@ func (d *AliyundriveOpen) upload(ctx context.Context, dstDir model.Obj, stream m
 		preTime := time.Now()
 		var offset, length int64 = 0, partSize
 		//var length
+		ss, err := streamPkg.NewStreamSectionReader(stream, int(partSize))
+		if err != nil {
+			return nil, err
+		}
 		for i := 0; i < len(createResp.PartInfoList); i++ {
 			if utils.IsCanceled(ctx) {
 				return nil, ctx.Err()
@@ -238,17 +242,13 @@ func (d *AliyundriveOpen) upload(ctx context.Context, dstDir model.Obj, stream m
 			if remain := stream.GetSize() - offset; length > remain {
 				length = remain
 			}
-			rd := utils.NewMultiReadable(io.LimitReader(stream, partSize))
-			if rapidUpload {
-				srd, err := stream.RangeRead(http_range.Range{Start: offset, Length: length})
-				if err != nil {
-					return nil, err
-				}
-				rd = utils.NewMultiReadable(srd)
+			rd, err := ss.GetSectionReader(offset, length)
+			if err != nil {
+				return nil, err
 			}
+			rateLimitedRd := driver.NewLimitedUploadStream(ctx, rd)
 			err = retry.Do(func() error {
-				_ = rd.Reset()
-				rateLimitedRd := driver.NewLimitedUploadStream(ctx, rd)
+				rd.Seek(0, io.SeekStart)
 				return d.uploadPart(ctx, rateLimitedRd, createResp.PartInfoList[i])
 			},
 				retry.Attempts(3),

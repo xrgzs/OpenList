@@ -5,17 +5,19 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
-	"github.com/OpenListTeam/OpenList/v4/internal/op"
+	"io"
 	"net/http"
 	"os"
 	"regexp"
 	"strconv"
 	"time"
 
+	"github.com/OpenListTeam/OpenList/v4/internal/op"
+	"github.com/OpenListTeam/OpenList/v4/internal/stream"
+
 	"github.com/OpenListTeam/OpenList/v4/drivers/base"
 	"github.com/OpenListTeam/OpenList/v4/internal/driver"
 	"github.com/OpenListTeam/OpenList/v4/internal/model"
-	"github.com/OpenListTeam/OpenList/v4/pkg/http_range"
 	"github.com/OpenListTeam/OpenList/v4/pkg/utils"
 	"github.com/go-resty/resty/v2"
 	"github.com/golang-jwt/jwt/v4"
@@ -251,27 +253,29 @@ func (d *GoogleDrive) getFiles(id string) ([]File, error) {
 	return res, nil
 }
 
-func (d *GoogleDrive) chunkUpload(ctx context.Context, stream model.FileStreamer, url string) error {
+func (d *GoogleDrive) chunkUpload(ctx context.Context, file model.FileStreamer, url string) error {
 	var defaultChunkSize = d.ChunkSize * 1024 * 1024
 	var offset int64 = 0
-	for offset < stream.GetSize() {
+	ss, err := stream.NewStreamSectionReader(file, int(defaultChunkSize))
+	if err != nil {
+		return err
+	}
+	for offset < file.GetSize() {
 		if utils.IsCanceled(ctx) {
 			return ctx.Err()
 		}
-		chunkSize := stream.GetSize() - offset
-		if chunkSize > defaultChunkSize {
-			chunkSize = defaultChunkSize
-		}
-		reader, err := stream.RangeRead(http_range.Range{Start: offset, Length: chunkSize})
+		chunkSize := min(file.GetSize()-offset, defaultChunkSize)
+		reader, err := ss.GetSectionReader(offset, chunkSize)
 		if err != nil {
 			return err
 		}
-		reader = driver.NewLimitedUploadStream(ctx, reader)
+		limitedReader := driver.NewLimitedUploadStream(ctx, reader)
 		_, err = d.request(url, http.MethodPut, func(req *resty.Request) {
+			reader.Seek(0, io.SeekStart)
 			req.SetHeaders(map[string]string{
 				"Content-Length": strconv.FormatInt(chunkSize, 10),
-				"Content-Range":  fmt.Sprintf("bytes %d-%d/%d", offset, offset+chunkSize-1, stream.GetSize()),
-			}).SetBody(reader).SetContext(ctx)
+				"Content-Range":  fmt.Sprintf("bytes %d-%d/%d", offset, offset+chunkSize-1, file.GetSize()),
+			}).SetBody(limitedReader).SetContext(ctx)
 		}, nil)
 		if err != nil {
 			return err
