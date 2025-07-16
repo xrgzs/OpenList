@@ -7,6 +7,7 @@ import (
 	"io"
 	stdpath "path"
 	"strings"
+	"time"
 
 	"github.com/OpenListTeam/OpenList/v4/internal/driver"
 	"github.com/OpenListTeam/OpenList/v4/internal/errs"
@@ -99,7 +100,18 @@ func (d *Alias) List(ctx context.Context, dir model.Obj, args model.ListArgs) ([
 	var objs []model.Obj
 	fsArgs := &fs.ListArgs{NoLog: true, Refresh: args.Refresh}
 	for _, dst := range dsts {
-		tmp, err := d.list(ctx, dst, sub, fsArgs)
+		var tmp []model.Obj
+		var err error
+		if d.Timeout > 0 {
+			childCtx, cancel := context.WithTimeout(ctx, time.Duration(d.Timeout)*time.Second)
+			tmp, err = d.list(childCtx, dst, sub, fsArgs)
+			cancel()
+		} else {
+			tmp, err = d.list(ctx, dst, sub, fsArgs)
+		}
+		if errors.Is(err, context.DeadlineExceeded) {
+			continue
+		}
 		if err == nil {
 			objs = append(objs, tmp...)
 		}
@@ -115,7 +127,20 @@ func (d *Alias) Link(ctx context.Context, file model.Obj, args model.LinkArgs) (
 	}
 	for _, dst := range dsts {
 		reqPath := stdpath.Join(dst, sub)
-		link, file, err := d.link(ctx, reqPath, args)
+
+		var link *model.Link
+		var file model.Obj
+		var err error
+		if d.Timeout > 0 {
+			childCtx, cancel := context.WithTimeout(ctx, time.Duration(d.Timeout)*time.Second)
+			link, file, err = d.link(childCtx, reqPath, args)
+			cancel()
+			if errors.Is(err, context.DeadlineExceeded) {
+				continue
+			}
+		} else {
+			link, file, err = d.link(ctx, reqPath, args)
+		}
 		if err != nil {
 			continue
 		}
