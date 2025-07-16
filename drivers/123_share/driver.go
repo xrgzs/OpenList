@@ -71,23 +71,18 @@ func (d *Pan123Share) Link(ctx context.Context, file model.Obj, args model.LinkA
 	// TODO return link of file, required
 	if f, ok := file.(File); ok {
 		//var resp DownResp
-		var headers map[string]string
-		if !utils.IsLocalIPAddr(args.IP) {
-			headers = map[string]string{
-				//"X-Real-IP":       "1.1.1.1",
-				"X-Forwarded-For": args.IP,
-			}
-		}
 		data := base.Json{
+			"driveId":   "0",
 			"shareKey":  d.ShareKey,
 			"SharePwd":  d.SharePwd,
 			"etag":      f.Etag,
 			"fileId":    f.FileId,
 			"s3keyFlag": f.S3KeyFlag,
+			"FileName":  f.FileName,
 			"size":      f.Size,
 		}
 		resp, err := d.request(DownloadInfo, http.MethodPost, func(req *resty.Request) {
-			req.SetBody(data).SetHeaders(headers)
+			req.SetBody(data)
 		}, nil)
 		if err != nil {
 			return nil, err
@@ -120,6 +115,11 @@ func (d *Pan123Share) Link(ctx context.Context, file model.Obj, args model.LinkA
 			link.URL = res.Header().Get("location")
 		} else if res.StatusCode() < 300 {
 			link.URL = utils.Json.Get(res.Body(), "data", "redirect_url").ToString()
+		}
+		if d.ref.Domain != "" {
+			parsedURL, _ := url.Parse(link.URL)
+			parsedURL.Host = d.ref.Domain
+			link.URL = parsedURL.String()
 		}
 		link.Header = http.Header{
 			"Referer": []string{"https://www.123pan.com/"},
