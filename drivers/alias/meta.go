@@ -16,6 +16,7 @@ type Addition struct {
 	DownloadPartSize    int    `json:"download_part_size" default:"0" type:"number" required:"false" help:"Need to enable proxy. Unit: KB"`
 	Writable            bool   `json:"writable" type:"bool" default:"false"`
 	ProviderPassThrough bool   `json:"provider_pass_through" type:"bool" default:"false"`
+	Timeout             int    `json:"timeout" default:"0" required:"false" type:"number" help:"0 for no timeout"`
 }
 
 var config = driver.Config{
