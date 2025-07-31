@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"golang.org/x/time/rate"
 
 	"github.com/OpenListTeam/OpenList/v4/drivers/base"
@@ -30,6 +31,7 @@ type Pan123 struct {
 	model.Storage
 	Addition
 	apiRateLimit sync.Map
+	params       Params
 }
 
 func (d *Pan123) Config() driver.Config {
@@ -41,9 +43,31 @@ func (d *Pan123) GetAddition() driver.Additional {
 }
 
 func (d *Pan123) Init(ctx context.Context) error {
-	_, err := d.Request(UserInfo, http.MethodGet, func(req *resty.Request) {
-		req.SetHeader("platform", "web")
-	}, nil)
+	// 拼接UserAgent
+	switch d.PlatformType {
+	case "android":
+		d.params.UserAgent = AndroidUserAgentPrefix + "(" + d.OsVersion + ";" + d.DeviceName + " " + d.DeiveType + ")"
+		d.params.Platform = AndroidPlatformParam
+		d.params.AppVersion = AndroidAppVer
+		d.params.XChannel = AndroidXChannel
+		d.params.XAppVersion = AndroidXAppVer
+
+	case "tv":
+		d.params.UserAgent = TVUserAgentPrefix + "(" + d.OsVersion + ";" + d.DeviceName + " " + d.DeiveType + ")"
+		d.params.Platform = TVPlatformParam
+		d.params.AppVersion = TVAndroidAppVer
+	}
+
+	if d.Addition.LoginUuid == "" {
+		d.Addition.LoginUuid = strings.ReplaceAll(uuid.New().String(), "-", "")
+	}
+
+	d.params.OsVersion = d.OsVersion
+	d.params.DeviceName = d.DeviceName
+	d.params.DeviceType = d.DeiveType
+	d.params.LoginUuid = d.Addition.LoginUuid
+
+	_, err := d.Request(UserInfo, http.MethodGet, nil, nil)
 	return err
 }
 
@@ -111,6 +135,11 @@ func (d *Pan123) Link(ctx context.Context, file model.Obj, args model.LinkArgs) 
 			link.URL = res.Header().Get("location")
 		} else if res.StatusCode() < 300 {
 			link.URL = utils.Json.Get(res.Body(), "data", "redirect_url").ToString()
+		}
+		if d.Domain != "" {
+			parsedURL, _ := url.Parse(link.URL)
+			parsedURL.Host = d.Domain
+			link.URL = parsedURL.String()
 		}
 		link.Header = http.Header{
 			"Referer": []string{fmt.Sprintf("%s://%s/", ou.Scheme, ou.Host)},
