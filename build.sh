@@ -46,7 +46,7 @@ ldflags="\
 "
 
 FetchWebRolling() {
-  pre_release_json=$(eval "curl -fsSL --max-time 2 $githubAuthArgs -H \"Accept: application/vnd.github.v3+json\" \"https://api.github.com/repos/OpenListTeam/OpenList-Frontend/releases/tags/rolling\"")
+  pre_release_json=$(eval "curl -fsSL --max-time 2 $githubAuthArgs -H \"Accept: application/vnd.github.v3+json\" \"https://api.github.com/repos/xrgzs/OpenList-Frontend/releases/tags/rolling\"")
   pre_release_assets=$(echo "$pre_release_json" | jq -r '.assets[].browser_download_url')
   
   # There is no lite for rolling
@@ -164,7 +164,7 @@ BuildDocker() {
 PrepareBuildDockerMusl() {
   mkdir -p build/musl-libs
   BASE="https://github.com/OpenListTeam/musl-compilers/releases/latest/download/"
-  FILES=(x86_64-linux-musl-cross aarch64-linux-musl-cross i486-linux-musl-cross armv6-linux-musleabihf-cross armv7l-linux-musleabihf-cross riscv64-linux-musl-cross powerpc64le-linux-musl-cross loongarch64-linux-musl-cross) ## Disable s390x-linux-musl-cross builds
+  FILES=(x86_64-linux-musl-cross aarch64-linux-musl-cross)
   for i in "${FILES[@]}"; do
     url="${BASE}${i}.tgz"
     lib_tgz="build/${i}.tgz"
@@ -183,8 +183,8 @@ BuildDockerMultiplatform() {
   docker_lflags="--extldflags '-static -fpic' $ldflags"
   export CGO_ENABLED=1
 
-  OS_ARCHES=(linux-amd64 linux-arm64 linux-386 linux-riscv64 linux-ppc64le linux-loong64) ## Disable linux-s390x builds
-  CGO_ARGS=(x86_64-linux-musl-gcc aarch64-linux-musl-gcc i486-linux-musl-gcc riscv64-linux-musl-gcc powerpc64le-linux-musl-gcc loongarch64-linux-musl-gcc) ## Disable s390x-linux-musl-gcc builds
+  OS_ARCHES=(linux-amd64 linux-arm64)
+  CGO_ARGS=(x86_64-linux-musl-gcc aarch64-linux-musl-gcc)
   for i in "${!OS_ARCHES[@]}"; do
     os_arch=${OS_ARCHES[$i]}
     cgo_cc=${CGO_ARGS[$i]}
@@ -195,20 +195,6 @@ BuildDockerMultiplatform() {
     export CC=${cgo_cc}
     echo "building for $os_arch"
     go build -o build/$os/$arch/"$appName" -ldflags="$docker_lflags" -tags=jsoniter .
-  done
-
-  DOCKER_ARM_ARCHES=(linux-arm/v6 linux-arm/v7)
-  CGO_ARGS=(armv6-linux-musleabihf-gcc armv7l-linux-musleabihf-gcc)
-  GO_ARM=(6 7)
-  export GOOS=linux
-  export GOARCH=arm
-  for i in "${!DOCKER_ARM_ARCHES[@]}"; do
-    docker_arch=${DOCKER_ARM_ARCHES[$i]}
-    cgo_cc=${CGO_ARGS[$i]}
-    export GOARM=${GO_ARM[$i]}
-    export CC=${cgo_cc}
-    echo "building for $docker_arch"
-    go build -o build/${docker_arch%%-*}/${docker_arch##*-}/"$appName" -ldflags="$docker_lflags" -tags=jsoniter .
   done
 }
 
