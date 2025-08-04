@@ -174,3 +174,8 @@ type UploadCompleteResp struct {
 		FileID    int64 `json:"fileID"`
 	} `json:"data"`
 }
+
+// 离线下载V1返回
+type OfflineTask struct {
+	TaskID int64 `json:"taskID"`
+}

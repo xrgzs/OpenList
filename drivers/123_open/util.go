@@ -27,6 +27,7 @@ var ( //不同情况下获取的AccessTokenQPS限制不同 如下模块化易于
 	Trash          = InitApiInfo(Api+"/api/v1/file/trash", 2)
 	UploadCreate   = InitApiInfo(Api+"/upload/v2/file/create", 2)
 	UploadComplete = InitApiInfo(Api+"/upload/v2/file/upload_complete", 0)
+	DownloadCreate = InitApiInfo(Api+"/api/v1/offline/download", 1)
 )
 
 func (d *Open123) Request(apiInfo *ApiInfo, method string, callback base.ReqCallback, resp interface{}) ([]byte, error) {

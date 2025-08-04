@@ -3,15 +3,18 @@ package _123_open
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"strconv"
 	"time"
 
+	"github.com/OpenListTeam/OpenList/v4/drivers/base"
 	"github.com/OpenListTeam/OpenList/v4/internal/driver"
 	"github.com/OpenListTeam/OpenList/v4/internal/errs"
 	"github.com/OpenListTeam/OpenList/v4/internal/model"
 	"github.com/OpenListTeam/OpenList/v4/internal/op"
 	"github.com/OpenListTeam/OpenList/v4/internal/stream"
 	"github.com/OpenListTeam/OpenList/v4/pkg/utils"
+	"github.com/go-resty/resty/v2"
 )
 
 type Open123 struct {
@@ -168,4 +171,15 @@ func (d *Open123) Put(ctx context.Context, dstDir model.Obj, file model.FileStre
 	return nil
 }
 
-var _ driver.Driver = (*Open123)(nil)
+func (d *Open123) OfflineDownload(ctx context.Context, fileUrl string, parentDir model.Obj, fileName string) (*OfflineTask, error) {
+
+	var resp any
+
+	d.Request(DownloadCreate, http.MethodPost, func(req *resty.Request) {
+		req.SetBody(base.Json{
+			"url":      "https://vip.123pan.cn/1815309870/...(过长省略)",
+			"fileName": "测试https离线下载.mp4",
+		})
+	}, &resp)
+	return nil, errs.NotSupport
+}
