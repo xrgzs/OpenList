@@ -17,9 +17,10 @@ type Addition struct {
 }
 
 var config = driver.Config{
-	Name:        "Doubao",
-	LocalSort:   true,
-	DefaultRoot: "0",
+	Name:              "Doubao",
+	LocalSort:         true,
+	DefaultRoot:       "0",
+	NoOverwriteUpload: true,
 }
 
 func init() {
