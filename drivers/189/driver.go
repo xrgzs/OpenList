@@ -8,7 +8,9 @@ import (
 	"github.com/OpenListTeam/OpenList/v4/drivers/base"
 	"github.com/OpenListTeam/OpenList/v4/internal/driver"
 	"github.com/OpenListTeam/OpenList/v4/internal/model"
+	"github.com/OpenListTeam/OpenList/v4/pkg/cookie"
 	"github.com/OpenListTeam/OpenList/v4/pkg/utils"
+	rand "github.com/OpenListTeam/OpenList/v4/pkg/utils/random"
 	"github.com/go-resty/resty/v2"
 	log "github.com/sirupsen/logrus"
 )
@@ -30,12 +32,21 @@ func (d *Cloud189) GetAddition() driver.Additional {
 }
 
 func (d *Cloud189) Init(ctx context.Context) error {
+	if d.BrowserID == "" {
+		d.BrowserID = strings.ToLower(rand.String(32))
+	}
+
 	d.client = base.NewRestyClient().
-		SetHeader("Referer", "https://cloud.189.cn/")
+		SetHeader("Referer", "https://cloud.189.cn/").
+		SetHeader("Browser-ID", d.BrowserID)
+	c := cookie.Parse(d.Cookie)
+	d.client.SetCookies(c)
 	return d.newLogin()
 }
 
 func (d *Cloud189) Drop(ctx context.Context) error {
+	d.Cookie = cookie.ToString(d.client.Cookies)
+	d.client = nil
 	return nil
 }
 
@@ -56,6 +67,8 @@ func (d *Cloud189) Link(ctx context.Context, file model.Obj, args model.LinkArgs
 		resty.RedirectPolicyFunc(func(req *http.Request, via []*http.Request) error {
 			return http.ErrUseLastResponse
 		}))
+
+	client.Cookies = d.client.Cookies
 	res, err := client.R().SetHeader("User-Agent", base.UserAgent).Get("https:" + resp.FileDownloadUrl)
 	if err != nil {
 		return nil, err

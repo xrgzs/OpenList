@@ -2,6 +2,7 @@ package _189
 
 import (
 	"errors"
+	"net/http"
 	"strconv"
 
 	"github.com/OpenListTeam/OpenList/v4/pkg/utils"
@@ -48,11 +49,16 @@ func (d *Cloud189) newLogin() error {
 	if err != nil {
 		return err
 	}
+	log.Debugf("189 loginUrl resp body: %s", res.String())
+	if res.StatusCode() != http.StatusOK {
+		return errors.New("get loginUrl error: " + res.String())
+	}
 	// Is logged in
 	redirectURL := res.RawResponse.Request.URL
 	if redirectURL.String() == "https://cloud.189.cn/web/main" {
 		return nil
 	}
+	d.client.Cookies = make([]*http.Cookie, 0)
 	lt := redirectURL.Query().Get("lt")
 	reqId := redirectURL.Query().Get("reqId")
 	appId := redirectURL.Query().Get("appId")
@@ -121,6 +127,10 @@ func (d *Cloud189) newLogin() error {
 	loginResult := utils.Json.Get(res.Body(), "result").ToInt()
 	if loginResult != 0 {
 		return errors.New(utils.Json.Get(res.Body(), "msg").ToString())
+	}
+	d.sessionKey, err = d.getSessionKey()
+	if err != nil {
+		return err
 	}
 	return nil
 }

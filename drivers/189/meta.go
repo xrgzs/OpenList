@@ -6,9 +6,10 @@ import (
 )
 
 type Addition struct {
-	Username string `json:"username" required:"true"`
-	Password string `json:"password" required:"true"`
-	Cookie   string `json:"cookie" help:"Fill in the cookie if need captcha"`
+	Username  string `json:"username" required:"true"`
+	Password  string `json:"password" required:"true"`
+	Cookie    string `json:"cookie" help:"Fill in the cookie if need captcha"`
+	BrowserID string `json:"browserId" help:"Browser ID, can be found in the request, if not filled, it will be generated automatically"`
 	driver.RootID
 }
 
