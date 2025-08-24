@@ -106,6 +106,9 @@ func (d *FnOsShare) Link(ctx context.Context, file model.Obj, args model.LinkArg
 		return nil, err
 	}
 	u.Path = ""
+	if d.CustomHost != "" {
+		u.Host = d.CustomHost
+	}
 	return &model.Link{URL: u.String() + resp.Data.Path}, nil
 }
 
