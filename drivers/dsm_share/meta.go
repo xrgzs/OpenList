@@ -7,14 +7,15 @@ import (
 
 type Addition struct {
 	driver.RootPath
-	Address  string `json:"address" type:"string" required:"true" help:"Share host, e.g. https://nas.example.com:5001"`
-	ShareID  string `json:"share_id" type:"string" required:"true" help:"Share ID, e.g. xxxxxx"`
-	Password string `json:"password" type:"string"`
+	Address       string `json:"address" type:"string" required:"true" help:"Share host, e.g. https://nas.example.com:5001"`
+	ShareID       string `json:"share_id" type:"string" required:"true" help:"Share ID, e.g. xxxxxx"`
+	Password      string `json:"password" type:"string"`
+	SortBy        string `json:"sort_by" type:"select" options:"name,size,mtime," default:"name" required:"true"`
+	SortDirection string `json:"sort_direction" type:"select" options:"ASC,DESC" default:"ASC" required:"true"`
 }
 
 var config = driver.Config{
 	Name:        "DSM Share",
-	LocalSort:   true,
 	NoUpload:    true,
 	OnlyProxy:   true,
 	DefaultRoot: "/",
