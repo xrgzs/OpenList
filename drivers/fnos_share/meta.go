@@ -7,8 +7,9 @@ import (
 
 type Addition struct {
 	driver.RootPath
-	Address  string `json:"address" type:"string" required:"true" help:"Share URL, e.g. https://example.com/s/xxxxxx"`
-	Password string `json:"password" type:"string"`
+	Address    string `json:"address" type:"string" required:"true" help:"Share URL, e.g. https://nas.example.com:5667/s/xxxxxx"`
+	Password   string `json:"password" type:"string"`
+	CustomHost string `json:"custom_host" type:"string" help:"Custom download host, e.g. down.example.com"`
 }
 
 var config = driver.Config{
