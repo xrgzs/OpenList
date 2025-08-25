@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/OpenListTeam/OpenList/v4/drivers/base"
 	"github.com/OpenListTeam/OpenList/v4/internal/driver"
 	"github.com/OpenListTeam/OpenList/v4/internal/errs"
 	"github.com/OpenListTeam/OpenList/v4/internal/model"
@@ -109,7 +110,14 @@ func (d *FnOsShare) Link(ctx context.Context, file model.Obj, args model.LinkArg
 	if d.CustomHost != "" {
 		u.Host = d.CustomHost
 	}
-	return &model.Link{URL: u.String() + resp.Data.Path}, nil
+	return &model.Link{
+		URL: u.String() + resp.Data.Path,
+		Header: http.Header{
+			"Cookie":     {d.Cookie},
+			"Referer":    {d.Address},
+			"User-Agent": {base.UserAgent},
+		},
+	}, nil
 }
 
 func (d *FnOsShare) MakeDir(ctx context.Context, parentDir model.Obj, dirName string) (model.Obj, error) {
