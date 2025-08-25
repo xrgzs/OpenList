@@ -16,6 +16,7 @@ var config = driver.Config{
 	Name:        "fnOS Share",
 	LocalSort:   true,
 	NoUpload:    true,
+	OnlyProxy:   true,
 	DefaultRoot: "/",
 }
 
