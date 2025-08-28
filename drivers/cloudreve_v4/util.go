@@ -259,15 +259,15 @@ func (d *CloudreveV4) refreshToken() error {
 func (d *CloudreveV4) parseJWT(token string, jwt any) error {
 	split := strings.Split(token, ".")
 	if len(split) != 3 {
-		return fmt.Errorf("invalid token length: %d. Ensure the token is a valid JWT", len(split))
+		return fmt.Errorf("invalid token length: %d, ensure the token is a valid JWT", len(split))
 	}
 	data, err := base64.RawURLEncoding.DecodeString(split[1])
 	if err != nil {
-		return fmt.Errorf("invalid token encoding: %w. Ensure the token is a valid JWT", err)
+		return fmt.Errorf("invalid token encoding: %w, ensure the token is a valid JWT", err)
 	}
 	err = json.Unmarshal(data, &jwt)
 	if err != nil {
-		return fmt.Errorf("invalid token content: %w. Ensure the token is a valid JWT", err)
+		return fmt.Errorf("invalid token content: %w, ensure the token is a valid JWT", err)
 	}
 	return nil
 }
