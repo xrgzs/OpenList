@@ -20,7 +20,9 @@ import (
 type CloudreveV4 struct {
 	model.Storage
 	Addition
-	ref *CloudreveV4
+	ref            *CloudreveV4
+	AccessExpires  string
+	RefreshExpires string
 }
 
 func (d *CloudreveV4) Config() driver.Config {
@@ -44,11 +46,14 @@ func (d *CloudreveV4) Init(ctx context.Context) error {
 	if d.ref != nil {
 		return nil
 	}
-	if d.AccessToken == "" && d.RefreshToken != "" {
+	if d.canLogin() {
+		return d.login()
+	}
+	if d.RefreshToken != "" {
 		return d.refreshToken()
 	}
-	if d.Username != "" {
-		return d.login()
+	if d.AccessToken == "" {
+		return errors.New("no way to authenticate. At least AccessToken is required")
 	}
 	return nil
 }

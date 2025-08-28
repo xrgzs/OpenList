@@ -67,10 +67,10 @@ type CaptchaResp struct {
 }
 
 type Token struct {
-	AccessToken    string    `json:"access_token"`
-	RefreshToken   string    `json:"refresh_token"`
-	AccessExpires  time.Time `json:"access_expires"`
-	RefreshExpires time.Time `json:"refresh_expires"`
+	AccessToken    string `json:"access_token"`
+	RefreshToken   string `json:"refresh_token"`
+	AccessExpires  string `json:"access_expires"`
+	RefreshExpires string `json:"refresh_expires"`
 }
 
 type TokenResponse struct {
