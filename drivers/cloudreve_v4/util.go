@@ -73,7 +73,7 @@ func (d *CloudreveV4) request(method string, path string, callback base.ReqCallb
 			}
 			return d.request(method, path, callback, out)
 		}
-		return errors.New(r.Msg)
+		return fmt.Errorf("%d: %s", r.Code, r.Msg)
 	}
 
 	if out != nil && r.Data != nil {
