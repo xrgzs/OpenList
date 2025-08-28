@@ -219,14 +219,7 @@ func (d *CloudreveV4) refreshToken() error {
 	}
 
 	// parse jwt to check if refresh token is valid
-	var jwt struct {
-		TokenType   string `json:"token_type"`
-		Sub         string `json:"sub"`
-		Exp         int    `json:"exp"`
-		Nbf         int    `json:"nbf"`
-		StateHash   string `json:"state_hash"`
-		RootTokenID string `json:"root_token_id"`
-	}
+	var jwt RefreshJWT
 	err := d.parseJWT(d.RefreshToken, &jwt)
 	if err != nil {
 		// if refresh token is invalid, try to login if possible
@@ -309,12 +302,7 @@ func (d *CloudreveV4) isTokenExpired() bool {
 	} else {
 		// fallback to parse jwt
 		// if failed, disable the storage
-		var jwt struct {
-			TokenType string `json:"token_type"`
-			Sub       string `json:"sub"`
-			Exp       int64  `json:"exp"`
-			Nbf       int64  `json:"nbf"`
-		}
+		var jwt AccessJWT
 		err = d.parseJWT(d.AccessToken, &jwt)
 		if err != nil {
 			d.GetStorage().SetStatus(fmt.Sprintf("Invalid AccessToken: %s", err.Error()))

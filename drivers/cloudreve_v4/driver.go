@@ -55,7 +55,8 @@ func (d *CloudreveV4) Init(ctx context.Context) error {
 	if d.AccessToken == "" {
 		return errors.New("no way to authenticate. At least AccessToken is required")
 	}
-	return nil
+	// ensure AccessToken is valid
+	return d.parseJWT(d.AccessToken, &AccessJWT{})
 }
 
 func (d *CloudreveV4) InitReference(storage driver.Driver) error {
