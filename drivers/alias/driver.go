@@ -119,29 +119,28 @@ func (d *Alias) List(ctx context.Context, dir model.Obj, args model.ListArgs) ([
 		} else {
 			tmp, err = fs.List(ctx, stdpath.Join(dst, sub), fsArgs)
 		}
-		if errors.Is(err, context.DeadlineExceeded) {
+		if err != nil {
+			// 忽略所有错误，继续遍历
 			continue
 		}
-		if err == nil {
-			tmp, err = utils.SliceConvert(tmp, func(obj model.Obj) (model.Obj, error) {
-				thumb, ok := model.GetThumb(obj)
-				objRes := model.Object{
-					Name:     obj.GetName(),
-					Size:     obj.GetSize(),
-					Modified: obj.ModTime(),
-					IsFolder: obj.IsDir(),
-				}
-				if !ok {
-					return &objRes, nil
-				}
-				return &model.ObjThumb{
-					Object: objRes,
-					Thumbnail: model.Thumbnail{
-						Thumbnail: thumb,
-					},
-				}, nil
-			})
-		}
+		tmp, err = utils.SliceConvert(tmp, func(obj model.Obj) (model.Obj, error) {
+			thumb, ok := model.GetThumb(obj)
+			objRes := model.Object{
+				Name:     obj.GetName(),
+				Size:     obj.GetSize(),
+				Modified: obj.ModTime(),
+				IsFolder: obj.IsDir(),
+			}
+			if !ok {
+				return &objRes, nil
+			}
+			return &model.ObjThumb{
+				Object: objRes,
+				Thumbnail: model.Thumbnail{
+					Thumbnail: thumb,
+				},
+			}, nil
+		})
 		if err == nil {
 			objs = append(objs, tmp...)
 		}
