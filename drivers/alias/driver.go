@@ -8,6 +8,7 @@ import (
 	"net/url"
 	stdpath "path"
 	"strings"
+	"time"
 
 	"github.com/OpenListTeam/OpenList/v4/internal/driver"
 	"github.com/OpenListTeam/OpenList/v4/internal/errs"
@@ -133,27 +134,37 @@ func (d *Alias) List(ctx context.Context, dir model.Obj, args model.ListArgs) ([
 	var objs []model.Obj
 	fsArgs := &fs.ListArgs{NoLog: true, Refresh: args.Refresh}
 	for _, dst := range dsts {
-		tmp, err := fs.List(ctx, stdpath.Join(dst, sub), fsArgs)
-		if err == nil {
-			tmp, err = utils.SliceConvert(tmp, func(obj model.Obj) (model.Obj, error) {
-				thumb, ok := model.GetThumb(obj)
-				objRes := model.Object{
-					Name:     obj.GetName(),
-					Size:     obj.GetSize(),
-					Modified: obj.ModTime(),
-					IsFolder: obj.IsDir(),
-				}
-				if !ok {
-					return &objRes, nil
-				}
-				return &model.ObjThumb{
-					Object: objRes,
-					Thumbnail: model.Thumbnail{
-						Thumbnail: thumb,
-					},
-				}, nil
-			})
+		var tmp []model.Obj
+		var err error
+		if d.Timeout > 0 {
+			childCtx, cancel := context.WithTimeout(ctx, time.Duration(d.Timeout)*time.Second)
+			tmp, err = fs.List(childCtx, stdpath.Join(dst, sub), fsArgs)
+			cancel()
+		} else {
+			tmp, err = fs.List(ctx, stdpath.Join(dst, sub), fsArgs)
 		}
+		if err != nil {
+			// 忽略所有错误，继续遍历
+			continue
+		}
+		tmp, err = utils.SliceConvert(tmp, func(obj model.Obj) (model.Obj, error) {
+			thumb, ok := model.GetThumb(obj)
+			objRes := model.Object{
+				Name:     obj.GetName(),
+				Size:     obj.GetSize(),
+				Modified: obj.ModTime(),
+				IsFolder: obj.IsDir(),
+			}
+			if !ok {
+				return &objRes, nil
+			}
+			return &model.ObjThumb{
+				Object: objRes,
+				Thumbnail: model.Thumbnail{
+					Thumbnail: thumb,
+				},
+			}, nil
+		})
 		if err == nil {
 			objs = append(objs, tmp...)
 		}
@@ -173,7 +184,19 @@ func (d *Alias) Link(ctx context.Context, file model.Obj, args model.LinkArgs) (
 	}
 	for _, dst := range dsts {
 		reqPath := stdpath.Join(dst, sub)
-		link, fi, err := d.link(ctx, reqPath, args)
+		var link *model.Link
+		var fi model.Obj
+		var err error
+		if d.Timeout > 0 {
+			childCtx, cancel := context.WithTimeout(ctx, time.Duration(d.Timeout)*time.Second)
+			link, fi, err = d.link(childCtx, reqPath, args)
+			cancel()
+		} else {
+			link, fi, err = d.link(ctx, reqPath, args)
+		}
+		if errors.Is(err, context.DeadlineExceeded) {
+			continue
+		}
 		if err != nil {
 			continue
 		}
