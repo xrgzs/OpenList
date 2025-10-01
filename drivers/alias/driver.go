@@ -8,6 +8,7 @@ import (
 	"net/url"
 	stdpath "path"
 	"strings"
+	"time"
 
 	"github.com/OpenListTeam/OpenList/v4/internal/driver"
 	"github.com/OpenListTeam/OpenList/v4/internal/errs"
@@ -138,12 +139,25 @@ func (d *Alias) List(ctx context.Context, dir model.Obj, args model.ListArgs) ([
 		return nil, errs.ObjectNotFound
 	}
 	var objs []model.Obj
+	fsArgs := &fs.ListArgs{
+		NoLog:              true,
+		Refresh:            args.Refresh,
+		WithStorageDetails: args.WithStorageDetails && d.DetailsPassThrough,
+	}
 	for _, dst := range dsts {
-		tmp, err := fs.List(ctx, stdpath.Join(dst, sub), &fs.ListArgs{
-			NoLog:              true,
-			Refresh:            args.Refresh,
-			WithStorageDetails: args.WithStorageDetails && d.DetailsPassThrough,
-		})
+		var tmp []model.Obj
+		var err error
+		if d.Timeout > 0 {
+			childCtx, cancel := context.WithTimeout(ctx, time.Duration(d.Timeout)*time.Second)
+			tmp, err = fs.List(childCtx, stdpath.Join(dst, sub), fsArgs)
+			cancel()
+		} else {
+			tmp, err = fs.List(ctx, stdpath.Join(dst, sub), fsArgs)
+		}
+		if err != nil {
+			// 忽略所有错误，继续遍历
+			continue
+		}
 		if err == nil {
 			tmp, err = utils.SliceConvert(tmp, func(obj model.Obj) (model.Obj, error) {
 				objRes := model.Object{
@@ -191,7 +205,16 @@ func (d *Alias) Link(ctx context.Context, file model.Obj, args model.LinkArgs) (
 	}
 	for _, dst := range dsts {
 		reqPath := stdpath.Join(dst, sub)
-		link, fi, err := d.link(ctx, reqPath, args)
+		var link *model.Link
+		var fi model.Obj
+		var err error
+		if d.Timeout > 0 {
+			childCtx, cancel := context.WithTimeout(ctx, time.Duration(d.Timeout)*time.Second)
+			link, fi, err = d.link(childCtx, reqPath, args)
+			cancel()
+		} else {
+			link, fi, err = d.link(ctx, reqPath, args)
+		}
 		if err != nil {
 			continue
 		}
