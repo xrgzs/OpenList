@@ -147,8 +147,8 @@ func (d *OpenList) Link(ctx context.Context, file model.Obj, args model.LinkArgs
 			if err == nil {
 				expires, err := time.ParseDuration(amzExpires + "s")
 				if err == nil {
-					// 确保大于0, 防止过期时间小于当前时间
-					exp = max(time.Until(t.Add(expires)), 0)
+					// 乘以系数 0.8，避免失效
+					exp = max(time.Duration(float64(time.Until(t.Add(expires)))*0.8), 0)
 				}
 			}
 		}
