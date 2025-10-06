@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"path"
 	"strings"
+	"time"
 
 	"github.com/OpenListTeam/OpenList/v4/drivers/base"
 	"github.com/OpenListTeam/OpenList/v4/internal/conf"
@@ -129,6 +130,35 @@ func (d *OpenList) Link(ctx context.Context, file model.Obj, args model.LinkArgs
 	}
 	if d.Cdn != "" {
 		resp.Data.RawURL = strings.Replace(resp.Data.RawURL, d.Address, d.Cdn, 1)
+	}
+	var exp time.Duration
+	// 设置直链缓存时间为列表缓存时间
+	// exp = time.Minute * time.Duration(d.GetStorage().CacheExpiration)
+
+	// 从直链中获取缓存时间
+	u, err := url.Parse(resp.Data.RawURL)
+	if err == nil {
+		q := u.Query()
+		// S3 直链格式（X-Amz-Date、X-Amz-Expires）
+		amzDate := q.Get("X-Amz-Date")       // in ISO 8601
+		amzExpires := q.Get("X-Amz-Expires") // in TTL
+		if amzDate != "" && amzExpires != "" {
+			t, err := time.Parse("20060102T150405Z", amzDate)
+			if err == nil {
+				expires, err := time.ParseDuration(amzExpires + "s")
+				if err == nil {
+					// 确保大于0, 防止过期时间小于当前时间
+					exp = max(time.Until(t.Add(expires)), 0)
+				}
+			}
+		}
+	}
+
+	if exp > 0 {
+		return &model.Link{
+			URL:        resp.Data.RawURL,
+			Expiration: &exp,
+		}, nil
 	}
 	return &model.Link{
 		URL: resp.Data.RawURL,
