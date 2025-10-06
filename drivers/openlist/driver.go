@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"path"
+	"strconv"
 	"strings"
 	"time"
 
@@ -139,19 +140,42 @@ func (d *OpenList) Link(ctx context.Context, file model.Obj, args model.LinkArgs
 	u, err := url.Parse(resp.Data.RawURL)
 	if err == nil {
 		q := u.Query()
-		// S3 直链格式（X-Amz-Date、X-Amz-Expires）
-		amzDate := q.Get("X-Amz-Date")       // in ISO 8601
-		amzExpires := q.Get("X-Amz-Expires") // in TTL
-		if amzDate != "" && amzExpires != "" {
-			t, err := time.Parse("20060102T150405Z", amzDate)
-			if err == nil {
-				expires, err := time.ParseDuration(amzExpires + "s")
+		switch resp.Data.Provider {
+		case "Doubao", "DoubaoShare":
+			// x-expires
+			xExpires := q.Get("x-expires") // in Unix timestamp (seconds)
+			if xExpires != "" {
+				t, err := strconv.ParseInt(xExpires, 10, 64)
 				if err == nil {
-					// 乘以系数 0.8，避免失效
-					exp = max(time.Duration(float64(time.Until(t.Add(expires)))*0.8), 0)
+					exp = time.Since(time.Unix(t, 0))
+				}
+			}
+		case "189Cloud", "189CloudTV", "189CloudPC":
+			// Expires
+			xExpires := q.Get("Expires") // in Unix timestamp (seconds)
+			if xExpires != "" {
+				t, err := strconv.ParseInt(xExpires, 10, 64)
+				if err == nil {
+					exp = time.Since(time.Unix(t, 0))
+				}
+			}
+		default:
+			// S3 直链格式（X-Amz-Date、X-Amz-Expires）
+			amzDate := q.Get("X-Amz-Date")       // in ISO 8601
+			amzExpires := q.Get("X-Amz-Expires") // in TTL
+			if amzDate != "" && amzExpires != "" {
+				t, err := time.Parse("20060102T150405Z", amzDate)
+				if err == nil {
+					expires, err := time.ParseDuration(amzExpires + "s")
+					if err == nil {
+						exp = time.Until(t.Add(expires))
+					}
 				}
 			}
 		}
+		// 乘以系数 0.8，避免失效
+		// 避免 exp 小于 0
+		exp = max(time.Duration(float64(exp)*0.8), 0)
 	}
 
 	if exp > 0 {
