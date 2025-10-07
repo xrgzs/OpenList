@@ -93,6 +93,9 @@ func redirect(c *gin.Context, link *model.Link) {
 			return
 		}
 	}
+	if link.Expiration != nil {
+		c.Header("X-Local-Cache-Expire", fmt.Sprintf("%d", int(link.Expiration.Seconds())))
+	}
 	c.Redirect(302, link.URL)
 }
 
