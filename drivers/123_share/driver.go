@@ -71,11 +71,13 @@ func (d *Pan123Share) Link(ctx context.Context, file model.Obj, args model.LinkA
 	// TODO return link of file, required
 	if f, ok := file.(File); ok {
 		data := base.Json{
+			"driveId":   "0",
 			"shareKey":  d.ShareKey,
 			"SharePwd":  d.SharePwd,
 			"etag":      f.Etag,
 			"fileId":    f.FileId,
 			"s3keyFlag": f.S3KeyFlag,
+			"FileName":  f.FileName,
 			"size":      f.Size,
 		}
 		resp, err := d.request(DownloadInfo, http.MethodPost, func(req *resty.Request) {
@@ -106,14 +108,21 @@ func (d *Pan123Share) Link(ctx context.Context, file model.Obj, args model.LinkA
 			return nil, err
 		}
 		log.Debug(res.String())
+		exp := 5 * time.Minute
 		link := model.Link{
-			URL: u_,
+			URL:        u_,
+			Expiration: &exp,
 		}
 		log.Debugln("res code: ", res.StatusCode())
 		if res.StatusCode() == 302 {
 			link.URL = res.Header().Get("location")
 		} else if res.StatusCode() < 300 {
 			link.URL = utils.Json.Get(res.Body(), "data", "redirect_url").ToString()
+		}
+		if d.ref.Domain != "" {
+			parsedURL, _ := url.Parse(link.URL)
+			parsedURL.Host = d.ref.Domain
+			link.URL = parsedURL.String()
 		}
 		link.Header = http.Header{
 			"Referer": []string{fmt.Sprintf("%s://%s/", ou.Scheme, ou.Host)},

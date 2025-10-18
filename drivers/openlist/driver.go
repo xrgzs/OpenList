@@ -7,7 +7,9 @@ import (
 	"net/http"
 	"net/url"
 	"path"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/OpenListTeam/OpenList/v4/drivers/base"
 	"github.com/OpenListTeam/OpenList/v4/internal/conf"
@@ -27,8 +29,15 @@ type OpenList struct {
 
 func (d *OpenList) Config() driver.Config {
 	if d.PassUAToUpsteam {
+		var cacheType uint8
+		if d.PassIPToUpsteam {
+			cacheType |= 1
+		}
+		if d.PassUAToUpsteam {
+			cacheType |= 2
+		}
 		c := config
-		c.LinkCacheType = 2 // add User-Agent to cache key
+		c.LinkCacheType = cacheType
 		return c
 	}
 	return config
@@ -82,6 +91,7 @@ func (d *OpenList) Drop(ctx context.Context) error {
 func (d *OpenList) List(ctx context.Context, dir model.Obj, args model.ListArgs) ([]model.Obj, error) {
 	var resp common.Resp[FsListResp]
 	_, _, err := d.request("/fs/list", http.MethodPost, func(req *resty.Request) {
+		req.SetContext(ctx)
 		req.SetResult(&resp).SetBody(ListReq{
 			PageReq: model.PageReq{
 				Page:    1,
@@ -115,22 +125,88 @@ func (d *OpenList) List(ctx context.Context, dir model.Obj, args model.ListArgs)
 
 func (d *OpenList) Link(ctx context.Context, file model.Obj, args model.LinkArgs) (*model.Link, error) {
 	var resp common.Resp[FsGetResp]
+	headers := map[string]string{
+		"User-Agent": base.UserAgent,
+	}
 	// if PassUAToUpsteam is true, then pass the user-agent to the upstream
-	userAgent := base.UserAgent
 	if d.PassUAToUpsteam {
-		userAgent = args.Header.Get("user-agent")
+		userAgent := args.Header.Get("user-agent")
 		if userAgent == "" {
-			userAgent = base.UserAgent
+			headers["User-Agent"] = base.UserAgent
+		}
+	}
+	// if PassIPToUpsteam is true, then pass the ip address to the upstream
+	if d.PassUAToUpsteam {
+		ip := args.IP
+		if ip == "" {
+			headers["X-Forwarded-For"] = ip
+			headers["X-Real-Ip"] = ip
 		}
 	}
 	_, _, err := d.request("/fs/get", http.MethodPost, func(req *resty.Request) {
+		req.SetContext(ctx)
 		req.SetResult(&resp).SetBody(FsGetReq{
 			Path:     file.GetPath(),
 			Password: d.MetaPassword,
-		}).SetHeader("user-agent", userAgent)
+		}).SetHeaders(headers)
 	})
 	if err != nil {
 		return nil, err
+	}
+	if d.Cdn != "" {
+		resp.Data.RawURL = strings.Replace(resp.Data.RawURL, d.Address, d.Cdn, 1)
+	}
+	var exp time.Duration
+	// 设置直链缓存时间为列表缓存时间
+	// exp = time.Minute * time.Duration(d.GetStorage().CacheExpiration)
+
+	// 从直链中获取缓存时间
+	u, err := url.Parse(resp.Data.RawURL)
+	if err == nil {
+		q := u.Query()
+		switch resp.Data.Provider {
+		case "Doubao", "DoubaoShare":
+			// x-expires
+			xExpires := q.Get("x-expires") // in Unix timestamp (seconds)
+			if xExpires != "" {
+				t, err := strconv.ParseInt(xExpires, 10, 64)
+				if err == nil {
+					exp = time.Since(time.Unix(t, 0))
+				}
+			}
+		case "189Cloud", "189CloudTV", "189CloudPC":
+			// Expires
+			xExpires := q.Get("Expires") // in Unix timestamp (seconds)
+			if xExpires != "" {
+				t, err := strconv.ParseInt(xExpires, 10, 64)
+				if err == nil {
+					exp = time.Since(time.Unix(t, 0))
+				}
+			}
+		default:
+			// S3 直链格式（X-Amz-Date、X-Amz-Expires）
+			amzDate := q.Get("X-Amz-Date")       // in ISO 8601
+			amzExpires := q.Get("X-Amz-Expires") // in TTL
+			if amzDate != "" && amzExpires != "" {
+				t, err := time.Parse("20060102T150405Z", amzDate)
+				if err == nil {
+					expires, err := time.ParseDuration(amzExpires + "s")
+					if err == nil {
+						exp = time.Until(t.Add(expires))
+					}
+				}
+			}
+		}
+		// 乘以系数 0.8，避免失效
+		// 避免 exp 小于 0
+		exp = max(time.Duration(float64(exp)*0.8), 0)
+	}
+
+	if exp > 0 {
+		return &model.Link{
+			URL:        resp.Data.RawURL,
+			Expiration: &exp,
+		}, nil
 	}
 	return &model.Link{
 		URL: resp.Data.RawURL,
