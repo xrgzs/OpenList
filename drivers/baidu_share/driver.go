@@ -4,12 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"path"
 	"time"
 
+	"github.com/OpenListTeam/OpenList/v4/drivers/baidu_netdisk"
 	"github.com/OpenListTeam/OpenList/v4/internal/driver"
 	"github.com/OpenListTeam/OpenList/v4/internal/errs"
 	"github.com/OpenListTeam/OpenList/v4/internal/model"
@@ -26,6 +26,7 @@ type BaiduShare struct {
 		Shareid string
 		Uk      string
 	}
+	ref *baidu_netdisk.BaiduNetdisk
 }
 
 func (d *BaiduShare) Config() driver.Config {
@@ -34,6 +35,15 @@ func (d *BaiduShare) Config() driver.Config {
 
 func (d *BaiduShare) GetAddition() driver.Additional {
 	return &d.Addition
+}
+
+func (d *BaiduShare) InitReference(storage driver.Driver) error {
+	refStorage, ok := storage.(*baidu_netdisk.BaiduNetdisk)
+	if ok {
+		d.ref = refStorage
+		return nil
+	}
+	return fmt.Errorf("ref: storage is not BaiduNetdisk")
 }
 
 func (d *BaiduShare) Init(ctx context.Context) error {
@@ -147,71 +157,67 @@ func (d *BaiduShare) List(ctx context.Context, dir model.Obj, args model.ListArg
 }
 
 func (d *BaiduShare) Link(ctx context.Context, file model.Obj, args model.LinkArgs) (*model.Link, error) {
-	// TODO return link of file, required
-	link := model.Link{Header: d.client.Header}
-	sign := ""
-	stamp := ""
-	signJson := struct {
+	if d.ref == nil {
+		return nil, fmt.Errorf("no reference")
+	}
+	// 1. 转存
+	transferJson := struct {
 		Errno int64 `json:"errno"`
-		Data  struct {
-			Stamp json.Number `json:"timestamp"`
-			Sign  string      `json:"sign"`
-		} `json:"data"`
+		Extra struct {
+			List []struct {
+				From     string `json:"from"`
+				FromFsID int64  `json:"from_fs_id"`
+				To       string `json:"to"`
+				ToFsID   int64  `json:"to_fs_id"`
+			} `json:"list"`
+		} `json:"extra"`
+		Info []struct {
+			Errno int64  `json:"errno"`
+			Fsid  int64  `json:"fsid"`
+			Path  string `json:"path"`
+		} `json:"info"`
+		Newno     string `json:"newno"`
+		RequestID int64  `json:"request_id"`
+		ShowMsg   string `json:"show_msg"`
+		TaskID    int64  `json:"task_id"`
 	}{}
 	resp, err := d.client.R().
-		SetQueryParam("surl", d.Surl).
-		SetResult(&signJson).
-		Get("share/tplconfig?fields=sign,timestamp&channel=chunlei&web=1&app_id=250528&clienttype=0")
-	if err == nil {
-		if resp.IsSuccess() && signJson.Errno == 0 {
-			stamp = signJson.Data.Stamp.String()
-			sign = signJson.Data.Sign
-		} else {
-			err = fmt.Errorf(" %s; %s; ", resp.Status(), resp.Body())
-		}
+		SetQueryParams(map[string]string{
+			"shareid":    d.info.Shareid,
+			"from":       d.info.Uk,
+			"sekey":      d.info.Seckey,
+			"ondup":      "newcopy",
+			"async":      "1",
+			"channel":    "chunlei",
+			"web":        "1",
+			"app_id":     "250528",
+			"clienttype": "0",
+		}).
+		SetFormData(map[string]string{
+			"fsidlist": fmt.Sprintf("[%s]", file.GetID()),
+			"path":     "/",
+		}).
+		SetResult(&transferJson).
+		Post("share/transfer")
+	if err != nil {
+		return nil, err
 	}
-	if err == nil {
-		respJson := struct {
-			Errno int64 `json:"errno"`
-			List  [1]struct {
-				Dlink string `json:"dlink"`
-			} `json:"list"`
-		}{}
-		resp, err = d.client.R().
-			SetQueryParam("sign", sign).
-			SetQueryParam("timestamp", stamp).
-			SetBody(url.Values{
-				"encrypt":   {"0"},
-				"extra":     {fmt.Sprintf(`{"sekey":"%s"}`, d.info.Seckey)},
-				"fid_list":  {fmt.Sprintf("[%s]", file.GetID())},
-				"primaryid": {d.info.Shareid},
-				"product":   {"share"},
-				"type":      {"nolimit"},
-				"uk":        {d.info.Uk},
-			}.Encode()).
-			SetResult(&respJson).
-			Post("api/sharedownload?app_id=250528&channel=chunlei&clienttype=12&web=1")
-		if err == nil {
-			if resp.IsSuccess() && respJson.Errno == 0 && respJson.List[0].Dlink != "" {
-				link.URL = respJson.List[0].Dlink
-			} else {
-				err = fmt.Errorf(" %s; %s; ", resp.Status(), resp.Body())
-			}
-		}
-		if err == nil {
-			resp, err = d.client.R().
-				SetDoNotParseResponse(true).
-				Get(link.URL)
-			if err == nil {
-				defer resp.RawBody().Close()
-				if resp.IsError() {
-					byt, _ := io.ReadAll(resp.RawBody())
-					err = fmt.Errorf(" %s; %s; ", resp.Status(), byt)
-				}
-			}
-		}
+	if !resp.IsSuccess() || transferJson.Errno != 0 {
+		return nil, fmt.Errorf(" %s; %s; ", resp.Status(), resp.Body())
 	}
-	return &link, err
+
+	// 2. 获取转存后到下载链接
+	if len(transferJson.Extra.List) == 0 {
+		return nil, fmt.Errorf("transfer response missing Extra.List")
+	}
+	obj, ok := file.(*model.Object)
+	if !ok {
+		return nil, fmt.Errorf("file is not *model.Object")
+	}
+	obj.ID = fmt.Sprint(transferJson.Extra.List[0].ToFsID)
+	obj.Path = transferJson.Extra.List[0].To
+
+	return d.ref.Link(ctx, obj, args)
 }
 
 func (d *BaiduShare) MakeDir(ctx context.Context, parentDir model.Obj, dirName string) error {
