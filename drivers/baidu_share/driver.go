@@ -52,6 +52,7 @@ func (d *BaiduShare) Init(ctx context.Context) error {
 	d.client = resty.New().
 		SetBaseURL("https://pan.baidu.com").
 		SetHeader("User-Agent", "netdisk").
+		SetHeader("Referer", "https://pan.baidu.com").
 		SetCookie(&http.Cookie{Name: "BDUSS", Value: d.BDUSS}).
 		SetCookie(&http.Cookie{Name: "ndut_fmt"})
 	respJson := struct {
