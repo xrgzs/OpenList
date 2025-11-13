@@ -213,14 +213,14 @@ func (d *Onedrive) createLink(path string) (string, error) {
 
 	if p.Host == "1drv.ms" {
 		// For personal, do some transformations
-		// https://1drv.ms/u/c/{user}/{share}?e=xxxx ->
+		// https://1drv.ms/t/c/{user}/{share} ->
 		// https://my.microsoftpersonalcontent.com/personal/{user}/_layouts/15/download.aspx?share={share}
 		paths := strings.Split(p.Path, "/")
-		if len(paths) < 4 || paths[2] == "" || paths[3] == "" {
+		if len(paths) < 5 || paths[3] == "" || paths[4] == "" {
 			return "", fmt.Errorf("invalid onedrive short link")
 		}
-		user := paths[2]
-		share := paths[3]
+		user := paths[3]
+		share := paths[4]
 		p.Scheme = "https"
 		p.Host = "my.microsoftpersonalcontent.com"
 		p.Path = fmt.Sprintf("/personal/%s/_layouts/15/download.aspx", user)
