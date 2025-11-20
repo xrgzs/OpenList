@@ -196,10 +196,11 @@ func (d *Open123) getFiles(parentFileId int64, limit int, lastFileId int64) (*Fi
 	return &resp, nil
 }
 
-func (d *Open123) getDownloadInfo(fileId int64) (*DownloadInfoResp, error) {
+func (d *Open123) GetDownloadInfo(fileId int64) (*DownloadInfoResp, error) {
 	var resp DownloadInfoResp
 
 	_, err := d.Request(DownloadInfo, http.MethodGet, func(req *resty.Request) {
+		req.SetHeader("X-Forwarded-For", "172.18.0.2")
 		req.SetQueryParams(map[string]string{
 			"fileId": strconv.FormatInt(fileId, 10),
 		})
