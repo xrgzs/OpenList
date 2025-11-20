@@ -209,10 +209,10 @@ func (d *Onedrive) createLink(path string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	q := p.Query()
-
+	// Do some transformations
+	q := url.Values{}
 	if p.Host == "1drv.ms" {
-		// For personal, do some transformations
+		// For personal
 		// https://1drv.ms/t/c/{user}/{share} ->
 		// https://my.microsoftpersonalcontent.com/personal/{user}/_layouts/15/download.aspx?share={share}
 		paths := strings.Split(p.Path, "/")
@@ -221,13 +221,22 @@ func (d *Onedrive) createLink(path string) (string, error) {
 		}
 		user := paths[3]
 		share := paths[4]
-		p.Scheme = "https"
 		p.Host = "my.microsoftpersonalcontent.com"
 		p.Path = fmt.Sprintf("/personal/%s/_layouts/15/download.aspx", user)
-		q = url.Values{}
+		q.Set("share", share)
+	} else if strings.Contains(p.Host, ".sharepoint.com") {
+		// https://{tenant}-my.sharepoint.com/:u:/g/personal/{user_email}/{share}
+		// https://{tenant}-my.sharepoint.com/personal/{user_email}/_layouts/15/download.aspx?share={share}
+		paths := strings.Split(p.Path, "/")
+		if len(paths) < 6 || paths[5] == "" {
+			return "", fmt.Errorf("invalid onedrive sharepoint link")
+		}
+		user := paths[4]
+		share := paths[5]
+		p.Path = fmt.Sprintf("/personal/%s/_layouts/15/download.aspx", user)
 		q.Set("share", share)
 	} else {
-		q.Set("download", "1")
+		return "", fmt.Errorf("unsupported onedrive link host: %s", p.Host)
 	}
 	p.RawQuery = q.Encode()
 	return p.String(), nil
