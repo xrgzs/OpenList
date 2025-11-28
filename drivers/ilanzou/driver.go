@@ -90,7 +90,8 @@ func (d *ILanZou) List(ctx context.Context, dir model.Obj, args model.ListArgs) 
 			break
 		}
 	}
-	return utils.SliceConvert(res, func(f ListItem) (model.Obj, error) {
+
+	cvt, err := utils.SliceConvert(res, func(f ListItem) (model.Obj, error) {
 		updTime, err := time.ParseInLocation("2006-01-02 15:04:05", f.UpdTime, time.Local)
 		if err != nil {
 			return nil, err
@@ -113,6 +114,30 @@ func (d *ILanZou) List(ctx context.Context, dir model.Obj, args model.ListArgs) 
 		}
 		return &obj, nil
 	})
+	if err != nil {
+		return nil, err
+	}
+
+	// 去重，仅保留第一个重名文件，其余的都删除
+	var result []model.Obj
+	seen := make(map[string]bool)
+	for _, obj := range cvt {
+		name := obj.GetName()
+		if seen[name] {
+			// 已经有同名文件，删除当前 obj
+			go func(obj model.Obj) {
+				utils.Log.Warnf("[ilanzou] start removing duplicate object: %s, id: %s", obj.GetName(), obj.GetID())
+				if err := d.Remove(context.Background(), obj); err != nil {
+					utils.Log.Warnf("[ilanzou] failed to remove duplicate object: %s, id: %s, err: %v", obj.GetName(), obj.GetID(), err)
+				}
+			}(obj)
+			continue
+		}
+		seen[name] = true
+		result = append(result, obj)
+	}
+
+	return result, nil
 }
 
 func (d *ILanZou) Link(ctx context.Context, file model.Obj, args model.LinkArgs) (*model.Link, error) {
@@ -152,8 +177,7 @@ func (d *ILanZou) Link(ctx context.Context, file model.Obj, args model.LinkArgs)
 	req := base.NoRedirectClient.R()
 
 	req.SetHeaders(map[string]string{
-		"Referer":    d.conf.site + "/",
-		"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36 Edg/125.0.0.0",
+		"Referer": d.conf.site + "/",
 	})
 	if d.Addition.Ip != "" {
 		req.SetHeader("X-Forwarded-For", d.Addition.Ip)
