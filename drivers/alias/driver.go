@@ -196,7 +196,7 @@ func (d *Alias) Link(ctx context.Context, file model.Obj, args model.LinkArgs) (
 	if common.GetApiUrl(ctx) == "" {
 		args.Redirect = false
 	}
-	for _, dst := range dsts {
+	for i, dst := range dsts {
 		reqPath := stdpath.Join(dst, sub)
 		var link *model.Link
 		var fi model.Obj
@@ -209,6 +209,11 @@ func (d *Alias) Link(ctx context.Context, file model.Obj, args model.LinkArgs) (
 			link, fi, err = d.link(ctx, reqPath, args)
 		}
 		if err != nil {
+			// 如果是最后一个路径，返回原始错误
+			if i == len(dsts)-1 {
+				return nil, err
+			}
+			// 否则继续下一个路径
 			continue
 		}
 		if link == nil {
