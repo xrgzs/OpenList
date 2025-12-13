@@ -334,6 +334,9 @@ func (y *Cloud189PC) Put(ctx context.Context, dstDir model.Obj, stream model.Fil
 	if y.Addition.RapidUpload && !stream.IsForceStreamUpload() {
 		if newObj, err := y.RapidUpload(ctx, dstDir, stream, isFamily, overwrite); err == nil {
 			return newObj, nil
+		} else if y.Addition.OnlyRapid {
+			// 仅允许秒传，秒传失败则直接返回错误，不进行后续上传
+			return nil, err
 		}
 	}
 
