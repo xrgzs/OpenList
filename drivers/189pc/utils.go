@@ -827,13 +827,23 @@ func (y *Cloud189PC) StreamUpload(ctx context.Context, dstDir model.Obj, file mo
 	return resp.toFile(), nil
 }
 
-func (y *Cloud189PC) RapidUpload(ctx context.Context, dstDir model.Obj, stream model.FileStreamer, isFamily bool, overwrite bool) (model.Obj, error) {
-	fileMd5 := stream.GetHash().GetHash(utils.MD5)
+func (y *Cloud189PC) RapidUpload(ctx context.Context, dstDir model.Obj, file model.FileStreamer, isFamily bool, overwrite bool) (model.Obj, error) {
+	fileMd5 := file.GetHash().GetHash(utils.MD5)
+	var err error
 	if len(fileMd5) < utils.MD5.Width {
-		return nil, errors.New("invalid hash")
+		// 仅秒传启用，获取本地文件校验时使用
+		if y.Addition.OnlyRapid {
+			fmt.Println("[189] RapidUpload old")
+			_, fileMd5, err = stream.CacheFullAndHash(file, nil, utils.MD5)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			return nil, errors.New("invalid hash")
+		}
 	}
 
-	uploadInfo, err := y.OldUploadCreate(ctx, dstDir.GetID(), fileMd5, stream.GetName(), fmt.Sprint(stream.GetSize()), isFamily)
+	uploadInfo, err := y.OldUploadCreate(ctx, dstDir.GetID(), fileMd5, file.GetName(), fmt.Sprint(file.GetSize()), isFamily)
 	if err != nil {
 		return nil, err
 	}
@@ -960,6 +970,9 @@ func (y *Cloud189PC) FastUpload(ctx context.Context, dstDir model.Obj, file mode
 	uploadInfo := uploadProgress.UploadInfo.Data
 	// 网盘中不存在该文件，开始上传
 	if uploadInfo.FileDataExists != 1 {
+		if y.Addition.OnlyRapid {
+			return nil, fmt.Errorf("fastupload can not do rapid upload")
+		}
 		threadG, upCtx := errgroup.NewGroupWithContext(ctx, y.uploadThread,
 			retry.Attempts(3),
 			retry.Delay(time.Second),
