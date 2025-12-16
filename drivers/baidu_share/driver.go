@@ -196,7 +196,7 @@ func (d *BaiduShare) Link(ctx context.Context, file model.Obj, args model.LinkAr
 		}).
 		SetFormData(map[string]string{
 			"fsidlist": fmt.Sprintf("[%s]", file.GetID()),
-			"path":     "/",
+			"path":     d.Addition.TransferPath,
 		}).
 		SetResult(&transferJson).
 		Post("share/transfer")
