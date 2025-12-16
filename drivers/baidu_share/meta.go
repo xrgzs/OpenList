@@ -11,9 +11,10 @@ type Addition struct {
 	// driver.RootID
 	// define other
 	// Field string `json:"field" type:"select" required:"true" options:"a,b,c" default:"a"`
-	Surl  string `json:"surl"`
-	Pwd   string `json:"pwd"`
-	BDUSS string `json:"BDUSS"`
+	Surl         string `json:"surl"`
+	Pwd          string `json:"pwd"`
+	BDUSS        string `json:"BDUSS"`
+	TransferPath string `json:"trasfer_path" default:"/"`
 }
 
 var config = driver.Config{
