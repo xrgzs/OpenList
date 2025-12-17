@@ -27,6 +27,16 @@ func ResetToken(c *gin.Context) {
 	common.SuccessResp(c, token)
 }
 
+func ResetTokenForProxy(c *gin.Context) {
+	token := random.Token()
+	item := model.SettingItem{Key: "token_for_proxy", Value: token, Type: conf.TypeString, Group: model.SINGLE, Flag: model.PRIVATE}
+	if err := op.SaveSettingItem(&item); err != nil {
+		common.ErrorResp(c, err, 500)
+		return
+	}
+	common.SuccessResp(c, token)
+}
+
 func GetSetting(c *gin.Context) {
 	key := c.Query("key")
 	keys := c.Query("keys")

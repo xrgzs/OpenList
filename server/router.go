@@ -155,6 +155,7 @@ func admin(g *gin.RouterGroup) {
 	setting.POST("/delete", handles.DeleteSetting)
 	setting.POST("/default", handles.DefaultSettings)
 	setting.POST("/reset_token", handles.ResetToken)
+	setting.POST("/reset_token_for_proxy", handles.ResetTokenForProxy)
 	setting.POST("/set_aria2", handles.SetAria2)
 	setting.POST("/set_qbit", handles.SetQbittorrent)
 	setting.POST("/set_transmission", handles.SetTransmission)
