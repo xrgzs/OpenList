@@ -150,7 +150,8 @@ func AuthAdmin(c *gin.Context) {
 }
 
 func AuthLink(c *gin.Context) {
-	if subtle.ConstantTimeCompare([]byte(c.GetHeader("Authorization")), []byte(setting.GetStr(conf.TokenForProxy))) == 1 {
+	tokenForProxy := setting.GetStr(conf.TokenForProxy)
+	if tokenForProxy != "" && subtle.ConstantTimeCompare([]byte(c.GetHeader("Authorization")), []byte(tokenForProxy)) == 1 {
 		c.Next()
 		return
 	}
