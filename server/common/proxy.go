@@ -12,8 +12,9 @@ import (
 	"github.com/OpenListTeam/OpenList/v4/internal/conf"
 	"github.com/OpenListTeam/OpenList/v4/internal/model"
 	"github.com/OpenListTeam/OpenList/v4/internal/net"
-	"github.com/OpenListTeam/OpenList/v4/internal/sign"
+	"github.com/OpenListTeam/OpenList/v4/internal/setting"
 	"github.com/OpenListTeam/OpenList/v4/internal/stream"
+	psign "github.com/OpenListTeam/OpenList/v4/pkg/sign"
 	"github.com/OpenListTeam/OpenList/v4/pkg/utils"
 )
 
@@ -148,7 +149,8 @@ func GenerateDownProxyURL(storage *model.Storage, reqPath string) string {
 	}
 	query := ""
 	if !storage.DisableProxySign {
-		query = "?sign=" + sign.Sign(reqPath)
+		signer := psign.NewHMACSign([]byte(setting.GetStr(conf.TokenForProxy)))
+		query = "?sign=" + signer.Sign(reqPath, 0)
 	}
 	return fmt.Sprintf("%s%s%s",
 		strings.Split(storage.DownProxyURL, "\n")[0],
