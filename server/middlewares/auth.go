@@ -148,3 +148,17 @@ func AuthAdmin(c *gin.Context) {
 		c.Next()
 	}
 }
+
+func AuthLink(c *gin.Context) {
+	if subtle.ConstantTimeCompare([]byte(c.GetHeader("Authorization")), []byte(setting.GetStr(conf.TokenForProxy))) == 1 {
+		c.Next()
+		return
+	}
+	user := c.Request.Context().Value(conf.UserKey).(*model.User)
+	if !user.IsAdmin() {
+		common.ErrorStrResp(c, "You are not an admin", 403)
+		c.Abort()
+	} else {
+		c.Next()
+	}
+}

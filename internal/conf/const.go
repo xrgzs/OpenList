@@ -94,6 +94,7 @@ const (
 
 	// single
 	Token         = "token"
+	TokenForProxy = "token_for_proxy"
 	IndexProgress = "index_progress"
 
 	// SSO
