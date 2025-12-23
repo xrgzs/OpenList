@@ -263,12 +263,16 @@ func (d *Qingque) Put(ctx context.Context, dstDir model.Obj, file model.FileStre
 	}
 
 	// step 3. report success
+	parentId := dstDir.GetID()
+	if parentId == "mine" {
+		parentId = ""
+	}
 	return d.request(http.MethodPost, "/docs/s3/feedback2", func(req *resty.Request) {
 		req.SetBody(base.Json{
 			"fileName":   file.GetName(),
 			"isSuccess":  true,
 			"id":         r.ID,
-			"parentId":   dstDir.GetID(),
+			"parentId":   parentId,
 			"uploadType": "upload",
 		})
 	}, nil)
