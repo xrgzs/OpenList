@@ -1,4 +1,4 @@
-package aliyunfile
+package aliyun_pds
 
 import (
 	"github.com/OpenListTeam/OpenList/v4/internal/driver"
@@ -17,13 +17,13 @@ type Addition struct {
 }
 
 var config = driver.Config{
-	Name:              "Aliyunfile",
+	Name:              "Aliyun PDS",
 	DefaultRoot:       "root",
 	NoOverwriteUpload: true,
 }
 
 func init() {
 	op.RegisterDriver(func() driver.Driver {
-		return &AliCDE{}
+		return &AliPDS{}
 	})
 }
