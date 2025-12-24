@@ -16,7 +16,6 @@ import (
 	"github.com/OpenListTeam/OpenList/v4/internal/conf"
 	"github.com/OpenListTeam/OpenList/v4/internal/driver"
 	"github.com/OpenListTeam/OpenList/v4/internal/model"
-	"github.com/OpenListTeam/OpenList/v4/internal/op"
 	"github.com/OpenListTeam/OpenList/v4/internal/stream"
 	"github.com/OpenListTeam/OpenList/v4/pkg/cron"
 	"github.com/OpenListTeam/OpenList/v4/pkg/utils"
@@ -58,16 +57,6 @@ func (d *AliCDE) Init(ctx context.Context) error {
 	err = d.refreshToken()
 	if err != nil {
 		return err
-	}
-	// get driver id
-	if d.DriveID == "" {
-		var userp UserResp
-		_, err, _ = d.request(d.ApiEndpoint+"/v2/user/get", http.MethodPost, nil, &userp)
-		if err != nil {
-			return err
-		}
-		d.DriveID = userp.DefaultDriveID
-		op.MustSaveDriverStorage(d)
 	}
 	d.cron = cron.NewCron(time.Hour * 2)
 	d.cron.Do(func() {

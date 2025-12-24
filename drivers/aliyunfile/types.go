@@ -78,39 +78,6 @@ type EndpointResp struct {
 	IsIntl         bool   `json:"is_intl"`
 }
 
-type UserResp struct {
-	// DomainID string `json:"domain_id"`
-	// UserID string `json:"user_id"`
-	// Avatar         string `json:"avatar"`
-	// CreatedAt      int64  `json:"created_at"`
-	// UpdatedAt      int64  `json:"updated_at"`
-	// Email          string `json:"email"`
-	// NickName       string `json:"nick_name"`
-	// Phone          string `json:"phone"`
-	// PhoneRegion    string `json:"phone_region"`
-	// Role           string `json:"role"`
-	// Status         string `json:"status"`
-	// UserName       string `json:"user_name"`
-	// Description    string `json:"description"`
-	DefaultDriveID string `json:"default_drive_id"`
-	// UserData       struct {
-	// } `json:"user_data"`
-	// DenyChangePasswordBySelf    bool        `json:"deny_change_password_by_self"`
-	// NeedChangePasswordNextLogin bool        `json:"need_change_password_next_login"`
-	// Creator                     string      `json:"creator"`
-	// ExpiredAt                   int         `json:"expired_at"`
-	// Permission                  interface{} `json:"permission"`
-	// DefaultLocation             string      `json:"default_location"`
-	// LastLoginTime               int64       `json:"last_login_time"`
-	// MsgSetting                  struct {
-	// 	SendSettings []struct {
-	// 		Category    string `json:"category"`
-	// 		SubCategory string `json:"sub_category"`
-	// 		Enable      bool   `json:"enable"`
-	// 	} `json:"send_settings"`
-	// } `json:"msg_setting"`
-}
-
 type DriveResp struct {
 	DomainID          string    `json:"domain_id"`
 	DriveID           string    `json:"drive_id"`
