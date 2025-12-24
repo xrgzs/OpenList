@@ -1,4 +1,4 @@
-package aliyunfile
+package aliyun_pds
 
 import (
 	"errors"
@@ -13,7 +13,7 @@ import (
 
 // do others that not defined in Driver interface
 
-func (d *AliCDE) refreshToken() error {
+func (d *AliPDS) refreshToken() error {
 	url := d.AuthEndpoint + "/v2/account/token"
 	var resp base.TokenResp
 	var e RespErr
@@ -37,7 +37,7 @@ func (d *AliCDE) refreshToken() error {
 	return nil
 }
 
-func (d *AliCDE) request(url, method string, callback base.ReqCallback, resp interface{}) ([]byte, error, RespErr) {
+func (d *AliPDS) request(url, method string, callback base.ReqCallback, resp interface{}) ([]byte, error, RespErr) {
 	req := base.RestyClient.R()
 	req.SetHeaders(map[string]string{
 		"Authorization": "Bearer\t" + d.AccessToken,
@@ -76,7 +76,7 @@ func (d *AliCDE) request(url, method string, callback base.ReqCallback, resp int
 	return res.Body(), nil, e
 }
 
-func (d *AliCDE) getFiles(fileId string) ([]File, error) {
+func (d *AliPDS) getFiles(fileId string) ([]File, error) {
 	marker := "first"
 	res := make([]File, 0)
 	for marker != "" {
@@ -111,7 +111,7 @@ func (d *AliCDE) getFiles(fileId string) ([]File, error) {
 	return res, nil
 }
 
-func (d *AliCDE) batch(srcId, dstId string, url string) error {
+func (d *AliPDS) batch(srcId, dstId string, url string) error {
 	res, err, _ := d.request(d.ApiEndpoint+"/v2/batch", http.MethodPost, func(req *resty.Request) {
 		req.SetBody(base.Json{
 			"requests": []base.Json{
