@@ -63,6 +63,7 @@ import (
 	_ "github.com/OpenListTeam/OpenList/v4/drivers/quark_uc_tv"
 	_ "github.com/OpenListTeam/OpenList/v4/drivers/s3"
 	_ "github.com/OpenListTeam/OpenList/v4/drivers/seafile"
+	_ "github.com/OpenListTeam/OpenList/v4/drivers/seewo_pinco"
 	_ "github.com/OpenListTeam/OpenList/v4/drivers/sftp"
 	_ "github.com/OpenListTeam/OpenList/v4/drivers/smb"
 	_ "github.com/OpenListTeam/OpenList/v4/drivers/strm"
