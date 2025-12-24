@@ -228,8 +228,8 @@ func (d *AliCDE) Put(ctx context.Context, dstDir model.Obj, streamer model.FileS
 				io.Reader
 				io.Closer
 			}{
-				Reader: io.MultiReader(buf, file),
-				Closer: file,
+				Reader: io.MultiReader(buf, streamer),
+				Closer: streamer,
 			}
 		}
 	} else {

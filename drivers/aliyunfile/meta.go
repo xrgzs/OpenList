@@ -17,8 +17,9 @@ type Addition struct {
 }
 
 var config = driver.Config{
-	Name:        "Aliyunfile",
-	DefaultRoot: "root",
+	Name:              "Aliyunfile",
+	DefaultRoot:       "root",
+	NoOverwriteUpload: true,
 }
 
 func init() {
