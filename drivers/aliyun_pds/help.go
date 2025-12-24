@@ -1,4 +1,4 @@
-package aliyunfile
+package aliyun_pds
 
 import (
 	"crypto/ecdsa"

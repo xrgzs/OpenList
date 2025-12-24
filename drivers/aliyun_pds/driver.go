@@ -1,4 +1,4 @@
-package aliyunfile
+package aliyun_pds
 
 import (
 	"bytes"
@@ -23,7 +23,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-type AliCDE struct {
+type AliPDS struct {
 	model.Storage
 	Addition
 	AccessToken  string
@@ -33,15 +33,15 @@ type AliCDE struct {
 	cron         *cron.Cron
 }
 
-func (d *AliCDE) Config() driver.Config {
+func (d *AliPDS) Config() driver.Config {
 	return config
 }
 
-func (d *AliCDE) GetAddition() driver.Additional {
+func (d *AliPDS) GetAddition() driver.Additional {
 	return &d.Addition
 }
 
-func (d *AliCDE) Init(ctx context.Context) error {
+func (d *AliPDS) Init(ctx context.Context) error {
 	// get entrypoint
 	var endp EndpointResp
 	_, err, _ := d.request("https://web-sv.aliyunpds.com/endpoint/get_endpoints", http.MethodPost, func(req *resty.Request) {
@@ -68,14 +68,14 @@ func (d *AliCDE) Init(ctx context.Context) error {
 	return nil
 }
 
-func (d *AliCDE) Drop(ctx context.Context) error {
+func (d *AliPDS) Drop(ctx context.Context) error {
 	if d.cron != nil {
 		d.cron.Stop()
 	}
 	return nil
 }
 
-func (d *AliCDE) List(ctx context.Context, dir model.Obj, args model.ListArgs) ([]model.Obj, error) {
+func (d *AliPDS) List(ctx context.Context, dir model.Obj, args model.ListArgs) ([]model.Obj, error) {
 	files, err := d.getFiles(dir.GetID())
 	if err != nil {
 		return nil, err
@@ -85,7 +85,7 @@ func (d *AliCDE) List(ctx context.Context, dir model.Obj, args model.ListArgs) (
 	})
 }
 
-func (d *AliCDE) Link(ctx context.Context, file model.Obj, args model.LinkArgs) (*model.Link, error) {
+func (d *AliPDS) Link(ctx context.Context, file model.Obj, args model.LinkArgs) (*model.Link, error) {
 	data := base.Json{
 		"drive_id":   d.DriveID,
 		"file_id":    file.GetID(),
@@ -110,7 +110,7 @@ func (d *AliCDE) Link(ctx context.Context, file model.Obj, args model.LinkArgs) 
 	}, nil
 }
 
-func (d *AliCDE) MakeDir(ctx context.Context, parentDir model.Obj, dirName string) error {
+func (d *AliPDS) MakeDir(ctx context.Context, parentDir model.Obj, dirName string) error {
 	_, err, _ := d.request(d.ApiEndpoint+"/v2/file/create", http.MethodPost, func(req *resty.Request) {
 		req.SetBody(base.Json{
 			"check_name_mode": "refuse",
@@ -124,7 +124,7 @@ func (d *AliCDE) MakeDir(ctx context.Context, parentDir model.Obj, dirName strin
 	return err
 }
 
-func (d *AliCDE) Move(ctx context.Context, srcObj, dstDir model.Obj) error {
+func (d *AliPDS) Move(ctx context.Context, srcObj, dstDir model.Obj) error {
 	_, err, _ := d.request(d.ApiEndpoint+"/v2/file/move", http.MethodPost, func(req *resty.Request) {
 		req.SetBody(base.Json{
 			"auto_rename":       true,
@@ -137,7 +137,7 @@ func (d *AliCDE) Move(ctx context.Context, srcObj, dstDir model.Obj) error {
 	return err
 }
 
-func (d *AliCDE) Rename(ctx context.Context, srcObj model.Obj, newName string) error {
+func (d *AliPDS) Rename(ctx context.Context, srcObj model.Obj, newName string) error {
 	_, err, _ := d.request(d.ApiEndpoint+"/v2/file/update", http.MethodPost, func(req *resty.Request) {
 		req.SetBody(base.Json{
 			"check_name_mode": "refuse",
@@ -149,7 +149,7 @@ func (d *AliCDE) Rename(ctx context.Context, srcObj model.Obj, newName string) e
 	return err
 }
 
-func (d *AliCDE) Copy(ctx context.Context, srcObj, dstDir model.Obj) error {
+func (d *AliPDS) Copy(ctx context.Context, srcObj, dstDir model.Obj) error {
 	_, err, _ := d.request(d.ApiEndpoint+"/v2/file/copy", http.MethodPost, func(req *resty.Request) {
 		req.SetBody(base.Json{
 			"auto_rename":       true,
@@ -162,7 +162,7 @@ func (d *AliCDE) Copy(ctx context.Context, srcObj, dstDir model.Obj) error {
 	return err
 }
 
-func (d *AliCDE) Remove(ctx context.Context, obj model.Obj) error {
+func (d *AliPDS) Remove(ctx context.Context, obj model.Obj) error {
 	_, err, _ := d.request(d.ApiEndpoint+"/v2/recyclebin/trash", http.MethodPost, func(req *resty.Request) {
 		req.SetBody(base.Json{
 			"drive_id":    d.DriveID,
@@ -173,7 +173,7 @@ func (d *AliCDE) Remove(ctx context.Context, obj model.Obj) error {
 	return err
 }
 
-func (d *AliCDE) Put(ctx context.Context, dstDir model.Obj, streamer model.FileStreamer, up driver.UpdateProgress) error {
+func (d *AliPDS) Put(ctx context.Context, dstDir model.Obj, streamer model.FileStreamer, up driver.UpdateProgress) error {
 	file := &stream.FileStream{
 		Obj:      streamer,
 		Reader:   streamer,
@@ -316,7 +316,7 @@ func (d *AliCDE) Put(ctx context.Context, dstDir model.Obj, streamer model.FileS
 	return fmt.Errorf("%+v", resp2)
 }
 
-func (d *AliCDE) GetDetails(ctx context.Context) (*model.StorageDetails, error) {
+func (d *AliPDS) GetDetails(ctx context.Context) (*model.StorageDetails, error) {
 	var resp DriveResp
 	_, err, _ := d.request(d.ApiEndpoint+"/v2/drive/get", http.MethodPost, func(req *resty.Request) {
 		req.SetContext(ctx)
@@ -330,4 +330,4 @@ func (d *AliCDE) GetDetails(ctx context.Context) (*model.StorageDetails, error) 
 	}, nil
 }
 
-var _ driver.Driver = (*AliCDE)(nil)
+var _ driver.Driver = (*AliPDS)(nil)
