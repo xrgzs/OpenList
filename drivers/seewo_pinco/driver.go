@@ -126,8 +126,8 @@ func (d *SeewoPinco) Copy(ctx context.Context, srcObj, dstDir model.Obj) (model.
 }
 
 func (d *SeewoPinco) Remove(ctx context.Context, obj model.Obj) error {
-	return d.api(ctx, "PutV1DriveMaterialsLocations", base.Json{
-		"resIdList": []string{obj.GetID()},
+	return d.api(ctx, "DeleteV1DriveMaterials", base.Json{
+		"resIds": []string{obj.GetID()},
 	}, nil)
 }
 
@@ -168,7 +168,7 @@ func (d *SeewoPinco) Put(ctx context.Context, dstDir model.Obj, file model.FileS
 	}
 
 	// Use regular upload for small files
-	return d.regularUpload(ctx, dstDir, file, md5, r.Data.FormUploadMeta, up)
+	return d.regularUpload(ctx, dstDir, file, md5, up)
 }
 
 func (d *SeewoPinco) GetDetails(ctx context.Context) (*model.StorageDetails, error) {
