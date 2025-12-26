@@ -77,3 +77,114 @@ type GetV1DriveMaterialsCapacityResp struct {
 		// } `json:"usedDetail"`
 	} `json:"data"`
 }
+
+type PostV1DriveMaterialsMatchResp struct {
+	BaseResp
+	Data struct {
+		Valid          bool                                         `json:"valid"`
+		NeedToUpload   bool                                         `json:"needToUpload"`
+		FormUploadMeta PostV1DriveMaterialsMatchResp_FormUploadMeta `json:"formUploadMeta"`
+	} `json:"data"`
+}
+
+type PostV1DriveMaterialsMatchResp_FormUploadMeta struct {
+	URL           string            `json:"url"`
+	Headers       map[string]string `json:"headers"`
+	Fields        map[string]string `json:"fields"`
+	FileFieldName string            `json:"fileFieldName"`
+}
+
+type CStoreUploadResp struct {
+	BaseResp
+	Data CStoreUploadResp_Data `json:"data"`
+}
+
+type CStoreUploadResp_Data struct {
+	FileSize    int    `json:"fileSize"`
+	DownloadURL string `json:"downloadUrl"`
+	FileKey     string `json:"fileKey"`
+}
+
+type PostV1DriveMaterialsCstoreWayResp struct {
+	BaseResp
+	Data struct {
+		ID           string `json:"id"`
+		Name         string `json:"name"`
+		MimeType     string `json:"mimeType"`
+		Size         int    `json:"size"`
+		SpaceID      string `json:"spaceId"`
+		CatalogID    int    `json:"catalogId"`
+		CatalogName  string `json:"catalogName"`
+		AppCode      string `json:"appCode"`
+		Creator      string `json:"creator"`
+		CreatorName  string `json:"creatorName"`
+		CreateTime   int64  `json:"createTime"`
+		ParentID     string `json:"parentId"`
+		ThumbnailURL string `json:"thumbnailUrl"`
+		UpdateTime   int64  `json:"updateTime"`
+		TypeTag      int    `json:"typeTag"`
+		File         bool   `json:"file"`
+	} `json:"data"`
+}
+
+type PostV2CstoreUploadPolicyResp struct {
+	BaseResp
+	Data struct {
+		PolicyList []struct {
+			UploadUrl    string            `json:"uploadUrl"`
+			FormFields   map[string]string `json:"formFields"`
+			HeaderFields map[string]string `json:"headerFields"`
+		} `json:"policyList"`
+	} `json:"data"`
+}
+
+type PostV3CstoreUploadPolicyResp struct {
+	BaseResp
+	Data struct {
+		PolicyList []struct {
+			UploadUrl    string            `json:"uploadUrl"`
+			FormFields   map[string]string `json:"formFields"`
+			HeaderFields map[string]string `json:"headerFields"`
+		} `json:"policyList"`
+	} `json:"data"`
+}
+
+type PostV1CstoreMultipartUploadPolicyResp struct {
+	BaseResp
+	Data struct {
+		AppID         int `json:"appId"`
+		ExpireSeconds int `json:"expireSeconds"`
+		PolicyList    []struct {
+			FileKey             string `json:"fileKey"`
+			PartSize            int64  `json:"partSize"`
+			Priority            int    `json:"priority"`
+			ServiceProviderName string `json:"serviceProviderName"`
+			UploadID            string `json:"uploadId"`
+			UploadMethod        string `json:"uploadMethod"`
+			UploadMsgField      string `json:"uploadMsgField"`
+			UploadMsgType       string `json:"uploadMsgType"`
+		} `json:"policyList"`
+	} `json:"data"`
+}
+
+type PostV1CstoreMultipartUploadRuleResp struct {
+	BaseResp
+	Data struct {
+		HeaderFields []struct {
+			Key   string `json:"key"`
+			Value string `json:"value"`
+		} `json:"headerFields"`
+		UploadURL string `json:"uploadUrl"`
+	} `json:"data"`
+}
+
+type PostV1CstoreMultipartCompleteResp struct {
+	BaseResp
+	Data struct {
+		FileKey       string `json:"fileKey"`
+		DownloadURL   string `json:"downloadUrl"`
+		MimeType      string `json:"mimeType"`
+		FileSize      int    `json:"fileSize"`
+		CustomeFields []any  `json:"customeFields"`
+	} `json:"data"`
+}
