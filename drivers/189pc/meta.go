@@ -21,6 +21,7 @@ type Addition struct {
 	FamilyTransfer bool   `json:"family_transfer"`
 	RapidUpload    bool   `json:"rapid_upload"`
 	NoUseOcr       bool   `json:"no_use_ocr"`
+	OnlyRapid      bool   `json:"only_rapid" default:"false"`
 }
 
 var config = driver.Config{
