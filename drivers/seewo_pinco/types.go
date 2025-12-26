@@ -127,24 +127,25 @@ type PostV1DriveMaterialsCstoreWayResp struct {
 	} `json:"data"`
 }
 
-type PostV2CstoreUploadPolicyResp struct {
-	BaseResp
-	Data struct {
-		PolicyList []struct {
-			UploadUrl    string            `json:"uploadUrl"`
-			FormFields   map[string]string `json:"formFields"`
-			HeaderFields map[string]string `json:"headerFields"`
-		} `json:"policyList"`
-	} `json:"data"`
-}
-
 type PostV3CstoreUploadPolicyResp struct {
 	BaseResp
 	Data struct {
-		PolicyList []struct {
-			UploadUrl    string            `json:"uploadUrl"`
-			FormFields   map[string]string `json:"formFields"`
-			HeaderFields map[string]string `json:"headerFields"`
+		AppID         string `json:"appId"`
+		KeyPrefix     string `json:"keyPrefix"`
+		ExpireSeconds int    `json:"expireSeconds"`
+		PolicyList    []struct {
+			Priority     int    `json:"priority"`
+			Type         string `json:"type"`
+			UploadURL    string `json:"uploadUrl"`
+			HeaderFields []struct {
+				Key   string `json:"key"`
+				Value string `json:"value"`
+			} `json:"headerFields"`
+			FormFields []struct {
+				Key   string `json:"key"`
+				Value string `json:"value"`
+			} `json:"formFields"`
+			FileKey string `json:"fileKey"`
 		} `json:"policyList"`
 	} `json:"data"`
 }
