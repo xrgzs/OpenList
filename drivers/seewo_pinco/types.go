@@ -188,3 +188,42 @@ type PostV1CstoreMultipartCompleteResp struct {
 		CustomeFields []any  `json:"customeFields"`
 	} `json:"data"`
 }
+
+type MissionTodayRecordResp struct {
+	Data struct {
+		SignRecord struct {
+			BeenSigned bool `json:"beenSigned"`
+			CurrentDay int  `json:"currentDay"`
+		} `json:"signRecord"`
+	} `json:"data"`
+	ErrorCode  int    `json:"error_code"`
+	Message    string `json:"message"`
+	ServerTime int64  `json:"serverTime"`
+}
+
+type MissionSignResp struct {
+	Data struct {
+		LotteryRecord struct {
+			AwardName        string `json:"awardName"`
+			LotteryType      string `json:"lotteryType"`
+			PrizeDescription string `json:"prizeDescription"`
+			PrizeName        string `json:"prizeName"`
+			PrizeParam       string `json:"prizeParam"`
+			PrizePictureURL  string `json:"prizePictureUrl"`
+			PrizeType        string `json:"prizeType"`
+			State            string `json:"state"`
+		} `json:"lotteryRecord"`
+		SignRecord struct {
+			BeenSigned       bool   `json:"beenSigned"`
+			CurrentDay       int    `json:"currentDay"`
+			PrizeDescription string `json:"prizeDescription"`
+			PrizeName        string `json:"prizeName"`
+			PrizeParam       string `json:"prizeParam"`
+			PrizePictureURL  string `json:"prizePictureUrl"`
+			PrizeType        string `json:"prizeType"`
+		} `json:"signRecord"`
+	} `json:"data"`
+	ErrorCode  int    `json:"error_code"`
+	Message    string `json:"message"`
+	ServerTime int64  `json:"serverTime"`
+}

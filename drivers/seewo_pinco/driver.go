@@ -2,6 +2,7 @@ package seewo_pinco
 
 import (
 	"context"
+	"time"
 
 	"github.com/OpenListTeam/OpenList/v4/drivers/base"
 	"github.com/OpenListTeam/OpenList/v4/internal/driver"
@@ -9,6 +10,7 @@ import (
 	"github.com/OpenListTeam/OpenList/v4/internal/model"
 	"github.com/OpenListTeam/OpenList/v4/internal/stream"
 	"github.com/OpenListTeam/OpenList/v4/pkg/cookie"
+	"github.com/OpenListTeam/OpenList/v4/pkg/cron"
 	"github.com/OpenListTeam/OpenList/v4/pkg/utils"
 	"github.com/go-resty/resty/v2"
 )
@@ -17,6 +19,7 @@ type SeewoPinco struct {
 	model.Storage
 	Addition
 	client *resty.Client
+	cron   *cron.Cron
 }
 
 func (d *SeewoPinco) Config() driver.Config {
@@ -34,11 +37,29 @@ func (d *SeewoPinco) Init(ctx context.Context) error {
 	d.client.SetCookieJar(nil)
 	c := cookie.Parse(d.Cookie)
 	d.client.SetCookies(c)
+
+	d.cron = cron.NewCron(time.Hour * 6)
+	d.cron.Do(func() {
+		err := d.signLottery()
+		if err != nil {
+			utils.Log.Errorf("%+v", err)
+		}
+	})
+	// 立即签到一次
+	err := d.signLottery()
+	if err != nil {
+		utils.Log.Errorf("%+v", err)
+
+	}
 	return nil
 }
 
 func (d *SeewoPinco) Drop(ctx context.Context) error {
 	d.Cookie = cookie.ToString(d.client.Cookies)
+
+	if d.cron != nil {
+		d.cron.Stop()
+	}
 	return nil
 }
 
