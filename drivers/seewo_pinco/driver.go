@@ -7,6 +7,7 @@ import (
 	"github.com/OpenListTeam/OpenList/v4/internal/driver"
 	"github.com/OpenListTeam/OpenList/v4/internal/errs"
 	"github.com/OpenListTeam/OpenList/v4/internal/model"
+	"github.com/OpenListTeam/OpenList/v4/internal/stream"
 	"github.com/OpenListTeam/OpenList/v4/pkg/cookie"
 	"github.com/OpenListTeam/OpenList/v4/pkg/utils"
 	"github.com/go-resty/resty/v2"
@@ -86,7 +87,8 @@ func (d *SeewoPinco) MakeDir(ctx context.Context, parentDir model.Obj, dirName s
 
 func (d *SeewoPinco) Move(ctx context.Context, srcObj, dstDir model.Obj) error {
 	return d.api(ctx, "PutV1DriveMaterialsLocations", base.Json{
-		"resIdList": []string{srcObj.GetID()},
+		"resIdList":      []string{srcObj.GetID()},
+		"targetFolderId": dstDir.GetID(),
 	}, nil)
 }
 
@@ -104,14 +106,48 @@ func (d *SeewoPinco) Copy(ctx context.Context, srcObj, dstDir model.Obj) (model.
 
 func (d *SeewoPinco) Remove(ctx context.Context, obj model.Obj) error {
 	return d.api(ctx, "PutV1DriveMaterialsLocations", base.Json{
-		"resIdList":      []string{obj.GetID()},
-		"targetFolderId": obj.GetID(),
+		"resIdList": []string{obj.GetID()},
 	}, nil)
 }
 
-func (d *SeewoPinco) Put(ctx context.Context, dstDir model.Obj, file model.FileStreamer, up driver.UpdateProgress) (model.Obj, error) {
-	// TODO upload file, optional
-	return nil, errs.NotImplement
+func (d *SeewoPinco) Put(ctx context.Context, dstDir model.Obj, file model.FileStreamer, up driver.UpdateProgress) error {
+	// Get MD5 hash
+	var err error
+	md5 := file.GetHash().GetHash(utils.MD5)
+	if len(md5) != utils.MD5.Width {
+		_, md5, err = stream.CacheFullAndHash(file, &up, utils.MD5)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Step1: Check if file exists (秒传验证)
+	var r PostV1DriveMaterialsMatchResp
+	err = d.api(ctx, "PostV1DriveMaterialsMatch", base.Json{
+		"fileMd5":  md5,
+		"fileSize": file.GetSize(),
+		"fileName": file.GetName(),
+		"mimeType": file.GetMimetype(),
+	}, &r)
+	if err != nil {
+		return err
+	}
+	if !r.Data.NeedToUpload {
+		// File already exists,秒传成功
+		return nil
+	}
+
+	// Determine if large file needs chunked upload (>200MB)
+	fileSize := file.GetSize()
+	useChunked := fileSize > 209715200 // 200MB
+
+	if useChunked {
+		// Use chunked upload for large files
+		return d.chunkedUpload(ctx, dstDir, file, md5, up)
+	}
+
+	// Use regular upload for small files
+	return d.regularUpload(ctx, dstDir, file, md5, r.Data.FormUploadMeta, up)
 }
 
 func (d *SeewoPinco) GetDetails(ctx context.Context) (*model.StorageDetails, error) {

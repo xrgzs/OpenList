@@ -15,9 +15,10 @@ type Addition struct {
 }
 
 var config = driver.Config{
-	Name:        "Seewo Pinco",
-	LocalSort:   true,
-	DefaultRoot: "0",
+	Name:              "Seewo Pinco",
+	LocalSort:         true,
+	DefaultRoot:       "0",
+	NoOverwriteUpload: true,
 }
 
 func init() {
