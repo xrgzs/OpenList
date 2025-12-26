@@ -18,16 +18,30 @@ import (
 	"github.com/avast/retry-go"
 )
 
-func (d *SeewoPinco) regularUpload(ctx context.Context, dstDir model.Obj, file model.FileStreamer, md5 string, formMeta PostV1DriveMaterialsMatchResp_FormUploadMeta, up driver.UpdateProgress) error {
+func (d *SeewoPinco) regularUpload(ctx context.Context, dstDir model.Obj, file model.FileStreamer, md5 string, up driver.UpdateProgress) error {
+	var r PostV3CstoreUploadPolicyResp
+	err := d.api(ctx, "PostV3CstoreUploadPolicy", base.Json{
+		"keySuffix": utils.Ext(file.GetName()),
+	}, &r)
+
+	if err != nil {
+		return err
+	}
+
+	if len(r.Data.PolicyList) == 0 {
+		return fmt.Errorf("no upload policy received")
+	}
+	policy := r.Data.PolicyList[0]
+
 	// Create multipart form
 	b := bytes.NewBuffer(make([]byte, 0, bytes.MinRead))
 	w := multipart.NewWriter(b)
-	for k, v := range formMeta.Fields {
-		if err := w.WriteField(k, v); err != nil {
+	for _, field := range policy.FormFields {
+		if err := w.WriteField(field.Key, field.Value); err != nil {
 			return err
 		}
 	}
-	_, err := w.CreateFormFile("file", file.GetName())
+	_, err = w.CreateFormFile("file", file.GetName())
 	if err != nil {
 		return err
 	}
@@ -50,15 +64,15 @@ func (d *SeewoPinco) regularUpload(ctx context.Context, dstDir model.Obj, file m
 	})
 
 	// Create request
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, formMeta.URL, rd)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, policy.UploadURL, rd)
 	if err != nil {
 		return err
 	}
 	req.Header.Set("content-type", w.FormDataContentType())
 	req.Header.Set("user-agent", base.UserAgent)
 	req.ContentLength = length
-	for k, v := range formMeta.Headers {
-		req.Header.Set(k, v)
+	for _, header := range policy.HeaderFields {
+		req.Header.Set(header.Key, header.Value)
 	}
 
 	// Execute upload
