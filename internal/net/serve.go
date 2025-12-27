@@ -3,7 +3,6 @@ package net
 import (
 	"compress/gzip"
 	"context"
-	"crypto/tls"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -283,10 +282,7 @@ func HttpClient() *http.Client {
 }
 
 func NewHttpClient() *http.Client {
-	transport := &http.Transport{
-		Proxy:           http.ProxyFromEnvironment,
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: conf.Conf.TlsInsecureSkipVerify},
-	}
+	transport := NewUTLSTransport()
 
 	SetProxyIfConfigured(transport)
 

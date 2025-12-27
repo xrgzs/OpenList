@@ -1,8 +1,10 @@
 package net
 
 import (
+	"context"
 	"io"
 	"mime/multipart"
+	"net"
 	"net/http"
 	"net/textproto"
 	"net/url"
@@ -15,6 +17,7 @@ import (
 
 	"github.com/OpenListTeam/OpenList/v4/pkg/http_range"
 	"github.com/go-resty/resty/v2"
+	utls "github.com/refraction-networking/utls"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -341,4 +344,41 @@ func SetRestyProxyIfConfigured(client *resty.Client) {
 			client.SetProxy(proxyURL.String())
 		}
 	}
+}
+
+// NewUTLSTransport creates a new http.Transport that uses utls for TLS connections
+func NewUTLSTransport() *http.Transport {
+	return &http.Transport{
+		Proxy: http.ProxyFromEnvironment,
+		// TLSClientConfig: &tls.Config{InsecureSkipVerify: conf.Conf.TlsInsecureSkipVerify},
+		DialTLSContext: DialTLSContextWithUTLS,
+	}
+}
+
+// DialTLSContextWithUTLS dials a TLS connection using utls for TLS handshake
+func DialTLSContextWithUTLS(ctx context.Context, network, addr string) (net.Conn, error) {
+	dialer := &net.Dialer{}
+	conn, err := dialer.DialContext(ctx, network, addr)
+	if err != nil {
+		return nil, err
+	}
+
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		conn.Close()
+		return nil, err
+	}
+
+	uconn := utls.UClient(conn, &utls.Config{
+		ServerName:         host,
+		InsecureSkipVerify: conf.Conf.TlsInsecureSkipVerify,
+	}, utls.HelloChrome_Auto)
+
+	err = uconn.Handshake()
+	if err != nil {
+		conn.Close()
+		return nil, err
+	}
+
+	return uconn, nil
 }

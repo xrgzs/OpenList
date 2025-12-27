@@ -398,8 +398,6 @@ github.com/gorilla/sessions v1.2.1 h1:DHd3rPN5lE3Ts3D8rKkQ8x/0kqfeNmBAaiSi+o7Fsg
 github.com/gorilla/sessions v1.2.1/go.mod h1:dk2InVEVJ0sfLlnXv9EAgkf6ecYs/i80K/zI+bUmuGM=
 github.com/gorilla/websocket v1.5.3 h1:saDtZ6Pbx/0u+bgYQ3q96pZgCzfhKXGPqt7kZ72aNNg=
 github.com/gorilla/websocket v1.5.3/go.mod h1:YR8l580nyteQvAITg2hZ9XVh4b55+EU/adAjf1fMHhE=
-github.com/halalcloud/golang-sdk-lite v0.0.0-20251006164234-3c629727c499 h1:4ovnBdiGDFi8putQGxhipuuhXItAgh4/YnzufPYkZkQ=
-github.com/halalcloud/golang-sdk-lite v0.0.0-20251006164234-3c629727c499/go.mod h1:8x1h4rm3s8xMcTyJrq848sQ6BJnKzl57mDY4CNshdPM=
 github.com/halalcloud/golang-sdk-lite v0.0.0-20251105081800-78cbb6786c38 h1:lsK2GVgI2Ox0NkRpQnN09GBOH7jtsjFK5tcIgxXlLr0=
 github.com/halalcloud/golang-sdk-lite v0.0.0-20251105081800-78cbb6786c38/go.mod h1:8x1h4rm3s8xMcTyJrq848sQ6BJnKzl57mDY4CNshdPM=
 github.com/hashicorp/errwrap v1.0.0/go.mod h1:YH+1FKiLXxHSkmPseP+kNlulaMuP3n2brvKWEqk/Jc4=
@@ -629,6 +627,8 @@ github.com/quic-go/quic-go v0.54.1 h1:4ZAWm0AhCb6+hE+l5Q1NAL0iRn/ZrMwqHRGQiFwj2e
 github.com/quic-go/quic-go v0.54.1/go.mod h1:e68ZEaCdyviluZmy44P6Iey98v/Wfz6HCjQEm+l8zTY=
 github.com/rclone/rclone v1.70.3 h1:rg/WNh4DmSVZyKP2tHZ4lAaWEyMi7h/F0r7smOMA3IE=
 github.com/rclone/rclone v1.70.3/go.mod h1:nLyN+hpxAsQn9Rgt5kM774lcRDad82x/KqQeBZ83cMo=
+github.com/refraction-networking/utls v1.8.1 h1:yNY1kapmQU8JeM1sSw2H2asfTIwWxIkrMJI0pRUOCAo=
+github.com/refraction-networking/utls v1.8.1/go.mod h1:jkSOEkLqn+S/jtpEHPOsVv/4V4EVnelwbMQl4vCWXAM=
 github.com/relvacode/iso8601 v1.6.0 h1:eFXUhMJN3Gz8Rcq82f9DTMW0svjtAVuIEULglM7QHTU=
 github.com/relvacode/iso8601 v1.6.0/go.mod h1:FlNp+jz+TXpyRqgmM7tnzHHzBnz776kmAH2h3sZCn0I=
 github.com/rfjakob/eme v1.1.2 h1:SxziR8msSOElPayZNFfQw4Tjx/Sbaeeh3eRvrHVMUs4=
