@@ -164,7 +164,7 @@ func (d *Gslb) Link(ctx context.Context, file model.Obj, args model.LinkArgs) (*
 			} else {
 				ctxChild = ctx
 			}
-			return fs.Link(ctxChild, rp, args)
+			return d.link(ctxChild, rp, args)
 		}()
 		if err != nil {
 			// 最后一个存储节点出错则返回错误
