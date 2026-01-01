@@ -3,7 +3,6 @@ package gslb
 import (
 	"context"
 	"fmt"
-	"net/netip"
 	"path"
 	"slices"
 	"strings"
@@ -14,10 +13,10 @@ import (
 	"github.com/OpenListTeam/OpenList/v4/internal/errs"
 	"github.com/OpenListTeam/OpenList/v4/internal/fs"
 	"github.com/OpenListTeam/OpenList/v4/internal/model"
+	"github.com/OpenListTeam/OpenList/v4/internal/op"
 	"github.com/OpenListTeam/OpenList/v4/internal/sign"
 	"github.com/OpenListTeam/OpenList/v4/pkg/utils"
 	"github.com/OpenListTeam/OpenList/v4/server/common"
-	"github.com/oschwald/geoip2-golang/v2"
 	"gopkg.in/yaml.v3"
 )
 
@@ -43,6 +42,9 @@ func (d *Gslb) Init(ctx context.Context) error {
 	err := yaml.Unmarshal([]byte(d.Addition.Paths), &d.storages)
 	if err != nil {
 		return err
+	}
+	if !db.GetGeo().HasData() {
+		return fmt.Errorf("geoip2 is not initialized")
 	}
 	return nil
 }
@@ -114,17 +116,11 @@ func (d *Gslb) Link(ctx context.Context, file model.Obj, args model.LinkArgs) (*
 	}
 
 	// 获取客户端 IP 信息
-	var ipinfo *geoip2.ASN
-	ip := args.IP
-	nip, _ := netip.ParseAddr(ip)
-	geo := db.GetGeoDb()
-	if geo != nil && nip.IsValid() {
-		info, err := geo.ASN(nip)
-		if err == nil && info.HasData() {
-			ipinfo = info
-		}
+	ipinfo := op.GetIPInfo(args.IP)
+
+	if data, err := utils.Json.MarshalToString(ipinfo); err == nil {
+		utils.Log.Infof("[gslb] request ip info: %s", data)
 	}
-	utils.Log.Infof("[gslb] request ip info: %+v", ipinfo)
 
 	// 拷贝存储节点列表，过滤不可下载的节点
 	sorted := make([]GslbStorage, 0, len(d.storages))
@@ -138,11 +134,17 @@ func (d *Gslb) Link(ctx context.Context, file model.Obj, args model.LinkArgs) (*
 	// 按优先级排序存储节点
 	slices.SortStableFunc(sorted, func(a, b GslbStorage) int {
 		// 按地理位置匹配，有则提高优先级
-		if ipinfo != nil {
-			if strings.Contains(ipinfo.AutonomousSystemOrganization, a.Aso) && !strings.Contains(ipinfo.AutonomousSystemOrganization, b.Aso) {
+		if ipinfo.HasData() {
+			// asn
+			if slices.Contains(a.Asn, ipinfo.Asn.AutonomousSystemNumber) && !slices.Contains(b.Asn, ipinfo.Asn.AutonomousSystemNumber) {
 				return -1
 			}
-			if slices.Contains(a.Asn, ipinfo.AutonomousSystemNumber) && !slices.Contains(b.Asn, ipinfo.AutonomousSystemNumber) {
+			// aso
+			if strings.Contains(ipinfo.Asn.AutonomousSystemOrganization, a.Aso) && !strings.Contains(ipinfo.Asn.AutonomousSystemOrganization, b.Aso) {
+				return -1
+			}
+			// iso
+			if slices.Contains(a.Iso, ipinfo.Country.Country.ISOCode) && !slices.Contains(b.Iso, ipinfo.Country.Country.ISOCode) {
 				return -1
 			}
 		}
