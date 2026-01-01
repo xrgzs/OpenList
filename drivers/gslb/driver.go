@@ -63,16 +63,26 @@ func (d *Gslb) List(ctx context.Context, dir model.Obj, args model.ListArgs) ([]
 	}
 
 	var objs []model.Obj
-	for _, storage := range d.storages {
-		if hasRef && !storage.Ref {
+	for _, s := range d.storages {
+		if hasRef && !s.Ref {
 			continue
 		}
-		rp := path.Join(storage.Path, dir.GetPath())
-		o, err := fs.List(ctx, rp, &fs.ListArgs{
-			Refresh:            args.Refresh,
-			NoLog:              true,
-			WithStorageDetails: args.WithStorageDetails,
-		})
+		rp := path.Join(s.Path, dir.GetPath())
+		o, err := func() ([]model.Obj, error) { // 为defer使用闭包
+			var ctxChild context.Context
+			if d.Timeout > 0 && !s.Ref {
+				var cancel context.CancelFunc
+				ctxChild, cancel = context.WithTimeout(ctx, time.Duration(d.Addition.Timeout)*time.Second)
+				defer cancel()
+			} else {
+				ctxChild = ctx
+			}
+			return fs.List(ctxChild, rp, &fs.ListArgs{
+				Refresh:            args.Refresh,
+				NoLog:              true,
+				WithStorageDetails: args.WithStorageDetails,
+			})
+		}()
 		if err != nil {
 			continue
 		}
@@ -144,9 +154,17 @@ func (d *Gslb) Link(ctx context.Context, file model.Obj, args model.LinkArgs) (*
 	// 按顺序依次尝试获取链接
 	for i, s := range sorted {
 		rp := path.Join(s.Path, file.GetPath())
-		ctxChild, cancel := context.WithTimeout(ctx, 3*time.Second)
-		link, _, err := fs.Link(ctxChild, rp, args)
-		cancel()
+		link, _, err := func() (*model.Link, model.Obj, error) { // 为defer使用闭包
+			var ctxChild context.Context
+			if d.Timeout > 0 {
+				var cancel context.CancelFunc
+				ctxChild, cancel = context.WithTimeout(ctx, time.Duration(d.Addition.Timeout)*time.Second)
+				defer cancel()
+			} else {
+				ctxChild = ctx
+			}
+			return fs.Link(ctxChild, rp, args)
+		}()
 		if err != nil {
 			// 最后一个存储节点出错则返回错误
 			if i == len(sorted)-1 {
