@@ -53,8 +53,20 @@ func (d *Gslb) Drop(ctx context.Context) error {
 }
 
 func (d *Gslb) List(ctx context.Context, dir model.Obj, args model.ListArgs) ([]model.Obj, error) {
+	// 如果有 Ref 标记的存储节点，则只访问这些节点
+	hasRef := false
+	for _, storage := range d.storages {
+		if storage.Ref {
+			hasRef = true
+			break
+		}
+	}
+
 	var objs []model.Obj
 	for _, storage := range d.storages {
+		if hasRef && !storage.Ref {
+			continue
+		}
 		rp := path.Join(storage.Path, dir.GetPath())
 		o, err := fs.List(ctx, rp, &fs.ListArgs{
 			Refresh:            args.Refresh,
@@ -104,9 +116,17 @@ func (d *Gslb) Link(ctx context.Context, file model.Obj, args model.LinkArgs) (*
 		}
 	}
 	utils.Log.Infof("[gslb] request ip info: %+v", ipinfo)
+
+	// 拷贝存储节点列表，过滤不可下载的节点
+	sorted := make([]GslbStorage, 0, len(d.storages))
+	for _, s := range d.storages {
+		if s.NoDown {
+			continue
+		}
+		sorted = append(sorted, s)
+	}
+
 	// 按优先级排序存储节点
-	sorted := make([]GslbStorage, len(d.storages))
-	copy(sorted, d.storages)
 	slices.SortStableFunc(sorted, func(a, b GslbStorage) int {
 		// 按地理位置匹配，有则提高优先级
 		if ipinfo != nil {
