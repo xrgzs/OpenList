@@ -87,7 +87,6 @@ func (d *Gslb) List(ctx context.Context, dir model.Obj, args model.ListArgs) ([]
 			continue
 		}
 		c, err := utils.SliceConvert(o, func(s model.Obj) (model.Obj, error) {
-			fmt.Println(path.Join(dir.GetPath(), s.GetName()))
 			return model.Obj(&model.Object{
 				ID:       s.GetID(),
 				Path:     path.Join(dir.GetPath(), s.GetName()),
