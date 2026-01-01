@@ -60,6 +60,7 @@ require (
 	github.com/mholt/archives v0.1.5
 	github.com/natefinch/lumberjack v2.0.0+incompatible
 	github.com/ncw/swift/v2 v2.0.5
+	github.com/oschwald/geoip2-golang/v2 v2.2.0
 	github.com/pkg/errors v0.9.1
 	github.com/pkg/sftp v1.13.10
 	github.com/pquerna/otp v1.5.0
@@ -130,6 +131,7 @@ require (
 	github.com/minio/minlz v1.0.1 // indirect
 	github.com/minio/xxml v0.0.3 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
+	github.com/oschwald/maxminddb-golang/v2 v2.3.0 // indirect
 	github.com/quic-go/qpack v0.6.0 // indirect
 	github.com/relvacode/iso8601 v1.7.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
@@ -313,7 +315,7 @@ require (
 	google.golang.org/grpc v1.82.0
 	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/asn1-ber.v1 v1.0.0-20181015200546-f715ec2f112d // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
+	gopkg.in/yaml.v3 v3.0.1
 	lukechampine.com/blake3 v1.1.7 // indirect
 )
 
