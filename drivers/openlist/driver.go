@@ -78,7 +78,7 @@ func (d *OpenList) Drop(ctx context.Context) error {
 func (d *OpenList) List(ctx context.Context, dir model.Obj, args model.ListArgs) ([]model.Obj, error) {
 	var resp common.Resp[FsListResp]
 	_, _, err := d.request("/fs/list", http.MethodPost, func(req *resty.Request) {
-		req.SetResult(&resp).SetBody(ListReq{
+		req.SetContext(ctx).SetResult(&resp).SetBody(ListReq{
 			PageReq: model.PageReq{
 				Page:    1,
 				PerPage: 0,
@@ -131,7 +131,7 @@ func (d *OpenList) Link(ctx context.Context, file model.Obj, args model.LinkArgs
 		}
 	}
 	_, _, err := d.request("/fs/get", http.MethodPost, func(req *resty.Request) {
-		req.SetResult(&resp).SetBody(FsGetReq{
+		req.SetContext(ctx).SetResult(&resp).SetBody(FsGetReq{
 			Path:     file.GetPath(),
 			Password: d.MetaPassword,
 		}).SetHeaders(headers)
