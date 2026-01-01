@@ -95,6 +95,9 @@ func Init(e *gin.Engine) {
 	webauthn.POST("/delete_authn", handles.DeleteAuthnLogin)
 	webauthn.GET("/getcredentials", handles.GetAuthnCredentials)
 
+	// geoip
+	api.GET("/geoip", handles.GeoIP2ASN)
+
 	// no need auth
 	public := api.Group("/public")
 	public.Any("/settings", handles.PublicSettings)
