@@ -166,6 +166,12 @@ func (d *Gslb) Link(ctx context.Context, file model.Obj, args model.LinkArgs) (*
 		return 0
 	})
 
+	var logSorted []string
+	for _, s := range sorted {
+		logSorted = append(logSorted, s.Path)
+	}
+	fmt.Printf("[glsb] sorted: %v", logSorted)
+
 	// 按顺序依次尝试获取链接
 	for i, s := range sorted {
 		rp := path.Join(s.Path, file.GetPath())
