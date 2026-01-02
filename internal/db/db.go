@@ -16,7 +16,7 @@ func Init(d *gorm.DB) {
 	if err != nil {
 		log.Fatalf("failed migrate database: %s", err.Error())
 	}
-	initGeoDB()
+	initIPDB()
 }
 
 func AutoMigrate(dst ...interface{}) error {
@@ -45,5 +45,5 @@ func Close() {
 		log.Errorf("failed to close db: %s", err.Error())
 		return
 	}
-	closeGeoDB()
+	closeIPDB()
 }
