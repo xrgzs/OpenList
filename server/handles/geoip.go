@@ -12,10 +12,5 @@ func GeoIP2ASN(c *gin.Context) {
 	if ipStr == "" {
 		ipStr = c.ClientIP()
 	}
-	ipinfo := op.GetIPInfo(ipStr)
-	if !ipinfo.HasData() {
-		common.ErrorStrResp(c, "invalid ip", 400)
-		return
-	}
-	common.SuccessResp(c, ipinfo)
+	common.SuccessResp(c, op.GetIPInfo(ipStr))
 }
