@@ -157,7 +157,7 @@ func (d *OpenList) Link(ctx context.Context, file model.Obj, args model.LinkArgs
 			if xExpires != "" {
 				t, err := strconv.ParseInt(xExpires, 10, 64)
 				if err == nil {
-					exp = time.Since(time.Unix(t, 0))
+					exp = time.Until(time.Unix(t, 0))
 				}
 			}
 		case "189Cloud", "189CloudTV", "189CloudPC":
@@ -166,7 +166,7 @@ func (d *OpenList) Link(ctx context.Context, file model.Obj, args model.LinkArgs
 			if xExpires != "" {
 				t, err := strconv.ParseInt(xExpires, 10, 64)
 				if err == nil {
-					exp = time.Since(time.Unix(t, 0))
+					exp = time.Until(time.Unix(t, 0))
 				}
 			}
 		default:
