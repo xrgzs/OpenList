@@ -1,15 +1,17 @@
 package model
 
-import (
-	"github.com/oschwald/geoip2-golang/v2"
-)
-
 type IPInfo struct {
-	IP      string          `json:"ip"`
-	Asn     *geoip2.ASN     `json:"asn"`
-	Country *geoip2.Country `json:"country"`
-}
-
-func (i IPInfo) HasData() bool {
-	return i.Asn != nil || i.Country != nil
+	IP string `json:"ip"`
+	// geoip asn mmdb fields
+	Asn uint   `json:"asn"`
+	Aso string `json:"aso"`
+	// qqwry fields
+	Country       string `json:"country"`
+	Region        string `json:"region"`
+	City          string `json:"city"`
+	District      string `json:"district"`
+	Owner         string `json:"owner"`
+	Isp           string `json:"isp"`
+	CountryCode   string `json:"country_code"`
+	ContinentCode string `json:"continent_code"`
 }

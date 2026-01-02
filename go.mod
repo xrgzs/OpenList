@@ -52,6 +52,7 @@ require (
 	github.com/hekmon/transmissionrpc/v3 v3.0.0
 	github.com/henrybear327/go-proton-api v1.0.0
 	github.com/ipfs/go-ipfs-api v0.7.0
+	github.com/ipipdotnet/ipdb-go v1.3.3
 	github.com/jlaffaye/ftp v0.2.4
 	github.com/json-iterator/go v1.1.12
 	github.com/kdomanski/iso9660 v0.4.0
