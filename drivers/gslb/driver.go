@@ -118,9 +118,9 @@ func (d *Gslb) Link(ctx context.Context, file model.Obj, args model.LinkArgs) (*
 	// 获取客户端 IP 信息
 	ipinfo := op.GetIPInfo(args.IP)
 
-	if data, err := utils.Json.MarshalToString(ipinfo); err == nil {
-		utils.Log.Infof("[gslb] request ip info: %s", data)
-	}
+	// if data, err := utils.Json.MarshalToString(ipinfo); err == nil {
+	// 	utils.Log.Infof("[gslb] request ip info: %s", data)
+	// }
 
 	// 拷贝存储节点列表，过滤不可下载的节点
 	sorted := make([]GslbStorage, 0, len(d.storages))
@@ -146,8 +146,12 @@ func (d *Gslb) Link(ctx context.Context, file model.Obj, args model.LinkArgs) (*
 			return 1
 		}
 		// aso
-		aAso := strings.Contains(strings.ToLower(ipinfo.Asn.AutonomousSystemOrganization), strings.ToLower(a.Aso))
-		bAso := strings.Contains(strings.ToLower(ipinfo.Asn.AutonomousSystemOrganization), strings.ToLower(b.Aso))
+		aAso := slices.ContainsFunc(a.Aso, func(s string) bool {
+			return strings.Contains(strings.ToLower(ipinfo.Asn.AutonomousSystemOrganization), strings.ToLower(s))
+		})
+		bAso := slices.ContainsFunc(b.Aso, func(s string) bool {
+			return strings.Contains(strings.ToLower(ipinfo.Asn.AutonomousSystemOrganization), strings.ToLower(s))
+		})
 		if aAso != bAso {
 			if aAso {
 				return -1
