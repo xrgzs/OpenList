@@ -183,6 +183,7 @@ func (d *Gslb) Link(ctx context.Context, file model.Obj, args model.LinkArgs) (*
 			}, nil
 		}
 		resultLink := *link
+		resultLink.Expiration = nil
 		resultLink.SyncClosers = utils.NewSyncClosers(link)
 		return &resultLink, nil
 	}
