@@ -43,8 +43,9 @@ func (d *Gslb) Init(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	if !db.GetGeo().HasData() {
-		return fmt.Errorf("geoip2 is not initialized")
+	if !db.GetIPDB().HasData() {
+		// return fmt.Errorf("ipdb is not initialized")
+		d.SetStatus("ipdb is not initialized")
 	}
 	return nil
 }
@@ -118,9 +119,9 @@ func (d *Gslb) Link(ctx context.Context, file model.Obj, args model.LinkArgs) (*
 	// 获取客户端 IP 信息
 	ipinfo := op.GetIPInfo(args.IP)
 
-	// if data, err := utils.Json.MarshalToString(ipinfo); err == nil {
-	// 	utils.Log.Infof("[gslb] request ip info: %s", data)
-	// }
+	if data, err := utils.Json.MarshalToString(ipinfo); err == nil {
+		utils.Log.Infof("[gslb] request ip info: %s", data)
+	}
 
 	// 拷贝存储节点列表，过滤不可下载的节点
 	sorted := make([]GslbStorage, 0, len(d.storages))
@@ -133,12 +134,9 @@ func (d *Gslb) Link(ctx context.Context, file model.Obj, args model.LinkArgs) (*
 
 	// 按优先级排序存储节点
 	slices.SortStableFunc(sorted, func(a, b GslbStorage) int {
-		if !ipinfo.HasData() {
-			return 0
-		}
 		// asn
-		aAsn := slices.Contains(a.Asn, ipinfo.Asn.AutonomousSystemNumber)
-		bAsn := slices.Contains(b.Asn, ipinfo.Asn.AutonomousSystemNumber)
+		aAsn := slices.Contains(a.Asn, ipinfo.Asn)
+		bAsn := slices.Contains(b.Asn, ipinfo.Asn)
 		if aAsn != bAsn {
 			if aAsn {
 				return -1
@@ -147,10 +145,10 @@ func (d *Gslb) Link(ctx context.Context, file model.Obj, args model.LinkArgs) (*
 		}
 		// aso
 		aAso := slices.ContainsFunc(a.Aso, func(s string) bool {
-			return strings.Contains(strings.ToLower(ipinfo.Asn.AutonomousSystemOrganization), strings.ToLower(s))
+			return strings.Contains(strings.ToLower(ipinfo.Aso), strings.ToLower(s))
 		})
 		bAso := slices.ContainsFunc(b.Aso, func(s string) bool {
-			return strings.Contains(strings.ToLower(ipinfo.Asn.AutonomousSystemOrganization), strings.ToLower(s))
+			return strings.Contains(strings.ToLower(ipinfo.Aso), strings.ToLower(s))
 		})
 		if aAso != bAso {
 			if aAso {
@@ -158,11 +156,24 @@ func (d *Gslb) Link(ctx context.Context, file model.Obj, args model.LinkArgs) (*
 			}
 			return 1
 		}
-		// iso
-		aIso := slices.Contains(a.Iso, ipinfo.Country.Country.ISOCode)
-		bIso := slices.Contains(b.Iso, ipinfo.Country.Country.ISOCode)
-		if aIso != bIso {
-			if aIso {
+		// ISP
+		aIsp := slices.ContainsFunc(a.Isp, func(s string) bool {
+			return strings.Contains(strings.ToLower(ipinfo.Isp), strings.ToLower(s))
+		})
+		bIsp := slices.ContainsFunc(b.Isp, func(s string) bool {
+			return strings.Contains(strings.ToLower(ipinfo.Isp), strings.ToLower(s))
+		})
+		if aIsp != bIsp {
+			if aIsp {
+				return -1
+			}
+			return 1
+		}
+		// CountryCode
+		aCountryCode := slices.Contains(a.CountryCode, ipinfo.CountryCode)
+		bCountryCode := slices.Contains(b.CountryCode, ipinfo.CountryCode)
+		if aCountryCode != bCountryCode {
+			if aCountryCode {
 				return -1
 			}
 			return 1
