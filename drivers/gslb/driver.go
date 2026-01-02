@@ -133,22 +133,36 @@ func (d *Gslb) Link(ctx context.Context, file model.Obj, args model.LinkArgs) (*
 
 	// 按优先级排序存储节点
 	slices.SortStableFunc(sorted, func(a, b GslbStorage) int {
-		// 按地理位置匹配，有则提高优先级
-		if ipinfo.HasData() {
-			// asn
-			if slices.Contains(a.Asn, ipinfo.Asn.AutonomousSystemNumber) && !slices.Contains(b.Asn, ipinfo.Asn.AutonomousSystemNumber) {
-				return -1
-			}
-			// aso
-			if strings.Contains(ipinfo.Asn.AutonomousSystemOrganization, a.Aso) && !strings.Contains(ipinfo.Asn.AutonomousSystemOrganization, b.Aso) {
-				return -1
-			}
-			// iso
-			if slices.Contains(a.Iso, ipinfo.Country.Country.ISOCode) && !slices.Contains(b.Iso, ipinfo.Country.Country.ISOCode) {
-				return -1
-			}
+		if !ipinfo.HasData() {
+			return 0
 		}
-		// 最后保留原有顺序
+		// asn
+		aAsn := slices.Contains(a.Asn, ipinfo.Asn.AutonomousSystemNumber)
+		bAsn := slices.Contains(b.Asn, ipinfo.Asn.AutonomousSystemNumber)
+		if aAsn != bAsn {
+			if aAsn {
+				return -1
+			}
+			return 1
+		}
+		// aso
+		aAso := strings.Contains(strings.ToLower(ipinfo.Asn.AutonomousSystemOrganization), strings.ToLower(a.Aso))
+		bAso := strings.Contains(strings.ToLower(ipinfo.Asn.AutonomousSystemOrganization), strings.ToLower(b.Aso))
+		if aAso != bAso {
+			if aAso {
+				return -1
+			}
+			return 1
+		}
+		// iso
+		aIso := slices.Contains(a.Iso, ipinfo.Country.Country.ISOCode)
+		bIso := slices.Contains(b.Iso, ipinfo.Country.Country.ISOCode)
+		if aIso != bIso {
+			if aIso {
+				return -1
+			}
+			return 1
+		}
 		return 0
 	})
 
