@@ -1,6 +1,9 @@
 package gslb
 
-import rcfs "github.com/rclone/rclone/fs"
+import (
+	rclonefs "github.com/rclone/rclone/fs"
+	"gopkg.in/yaml.v3"
+)
 
 // GslbStorage 表示单个后端存储的信息
 type GslbStorage struct {
@@ -19,7 +22,29 @@ type GslbStorage struct {
 	// 禁止下载时使用该 Ref 存储
 	NoDown bool `yaml:"no_down"`
 	// 过滤文件大小-小于该值的文件
-	MinSize rcfs.SizeSuffix `yaml:"min_size"`
+	MinSize SizeSuffix `yaml:"min_size"`
 	// 过滤文件大小-大于该值的文件
-	MaxSize rcfs.SizeSuffix `yaml:"max_size"`
+	MaxSize SizeSuffix `yaml:"max_size"`
+}
+
+// SizeSuffix 包装 rclone fs.SizeSuffix 以支持 YAML 序列化
+type SizeSuffix struct {
+	rclonefs.SizeSuffix
+}
+
+func (s *SizeSuffix) UnmarshalYAML(node *yaml.Node) error {
+	var str string
+	if err := node.Decode(&str); err != nil {
+		return err
+	}
+	return s.SizeSuffix.Set(str)
+}
+
+func (s SizeSuffix) MarshalYAML() (interface{}, error) {
+	return s.SizeSuffix.String(), nil
+}
+
+// Int64 返回字节数
+func (s SizeSuffix) Int64() int64 {
+	return int64(s.SizeSuffix)
 }
