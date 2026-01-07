@@ -129,6 +129,13 @@ func (d *Gslb) Link(ctx context.Context, file model.Obj, args model.LinkArgs) (*
 		if s.NoDown {
 			continue
 		}
+		if s.MinSize > 0 && file.GetSize() < s.MinSize*1024*1024 {
+			continue
+		}
+		if s.MaxSize > 0 && file.GetSize() > s.MaxSize*1024*1024 {
+			continue
+		}
+
 		sorted = append(sorted, s)
 	}
 

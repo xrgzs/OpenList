@@ -16,4 +16,8 @@ type GslbStorage struct {
 	Ref bool `yaml:"ref"`
 	// 禁止下载时使用该 Ref 存储
 	NoDown bool `yaml:"no_down"`
+	// 过滤文件大小-小于该值的文件，单位MB
+	MinSize int64 `yaml:"min_size"`
+	// 过滤文件大小-大于该值的文件，单位MB
+	MaxSize int64 `yaml:"max_size"`
 }
