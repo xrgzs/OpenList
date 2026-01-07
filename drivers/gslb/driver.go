@@ -158,10 +158,10 @@ func (d *Gslb) Link(ctx context.Context, file model.Obj, args model.LinkArgs) (*
 		}
 		// ISP
 		aIsp := slices.ContainsFunc(a.Isp, func(s string) bool {
-			return strings.Contains(strings.ToLower(ipinfo.Isp), strings.ToLower(s))
+			return ipinfo.Isp == s
 		})
 		bIsp := slices.ContainsFunc(b.Isp, func(s string) bool {
-			return strings.Contains(strings.ToLower(ipinfo.Isp), strings.ToLower(s))
+			return ipinfo.Isp == s
 		})
 		if aIsp != bIsp {
 			if aIsp {
