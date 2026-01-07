@@ -129,10 +129,10 @@ func (d *Gslb) Link(ctx context.Context, file model.Obj, args model.LinkArgs) (*
 		if s.NoDown {
 			continue
 		}
-		if s.MinSize > 0 && file.GetSize() < int64(s.MinSize) {
+		if s.MinSize.Int64() > 0 && file.GetSize() < s.MinSize.Int64() {
 			continue
 		}
-		if s.MaxSize > 0 && file.GetSize() > int64(s.MaxSize) {
+		if s.MaxSize.Int64() > 0 && file.GetSize() > s.MaxSize.Int64() {
 			continue
 		}
 
