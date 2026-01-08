@@ -34,12 +34,9 @@ type File struct {
 }
 
 func fileToObj(f File) *model.ObjThumb {
-	ht, ok := utils.GetHashByName(f.ContentHashName)
 	var hashInfo utils.HashInfo
-	if ok {
+	if ht, ok := utils.GetHashByName(f.ContentHashName); ok {
 		hashInfo = utils.NewHashInfo(ht, f.ContentHash)
-	} else {
-		hashInfo = utils.NewHashInfo(nil, "")
 	}
 	return &model.ObjThumb{
 		Object: model.Object{
