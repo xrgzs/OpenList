@@ -326,7 +326,10 @@ func (d *AliPDS) GetDetails(ctx context.Context) (*model.StorageDetails, error) 
 		return nil, err
 	}
 	return &model.StorageDetails{
-		DiskUsage: driver.DiskUsageFromUsedAndTotal(resp.UsedSize, resp.TotalSize),
+		DiskUsage: model.DiskUsage{
+			TotalSpace: resp.TotalSize,
+			UsedSpace:  resp.UsedSize,
+		},
 	}, nil
 }
 
