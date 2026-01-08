@@ -283,9 +283,6 @@ func (d *AliPDS) Put(ctx context.Context, dstDir model.Obj, streamer model.FileS
 			return ctx.Err()
 		}
 		url := partInfo.UploadUrl
-		if d.InternalUpload {
-			url = partInfo.InternalUploadUrl
-		}
 		req, err := http.NewRequestWithContext(ctx, http.MethodPut, url, io.LimitReader(rateLimited, DEFAULT))
 		if err != nil {
 			return err
