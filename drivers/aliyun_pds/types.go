@@ -88,8 +88,8 @@ type DriveResp struct {
 	OwnerType         string    `json:"owner_type"`
 	DriveType         string    `json:"drive_type"`
 	Status            string    `json:"status"`
-	UsedSize          uint64    `json:"used_size"`
-	TotalSize         uint64    `json:"total_size"`
+	UsedSize          int64     `json:"used_size"`
+	TotalSize         int64     `json:"total_size"`
 	StoreID           string    `json:"store_id"`
 	RelativePath      string    `json:"relative_path"`
 	EncryptMode       string    `json:"encrypt_mode"`
