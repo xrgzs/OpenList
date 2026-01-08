@@ -63,8 +63,8 @@ func contentToObj(c Content) *model.ObjThumbURL {
 type GetV1DriveMaterialsCapacityResp struct {
 	BaseResp
 	Data struct {
-		Capacity uint64 `json:"capacity"`
-		Used     uint64 `json:"used"`
+		Capacity int64 `json:"capacity"`
+		Used     int64 `json:"used"`
 		// UsedDetail []struct {
 		// 	AppCode         string `json:"appCode"`
 		// 	AppName         string `json:"appName"`
