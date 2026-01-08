@@ -180,7 +180,10 @@ func (d *SeewoPinco) GetDetails(ctx context.Context) (*model.StorageDetails, err
 		return nil, err
 	}
 	return &model.StorageDetails{
-		DiskUsage: driver.DiskUsageFromUsedAndTotal(r.Data.Used, r.Data.Capacity),
+		DiskUsage: model.DiskUsage{
+			TotalSpace: r.Data.Capacity,
+			UsedSpace:  r.Data.Used,
+		},
 	}, nil
 }
 
