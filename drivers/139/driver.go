@@ -54,7 +54,7 @@ func (d *Yun139) Init(ctx context.Context) error {
 				return fmt.Errorf("authorization is empty and username/password is not provided")
 			}
 		}
-		err := d.refreshToken()
+		err := d.autoDailyTasks()
 		if err != nil {
 			return err
 		}
@@ -84,7 +84,8 @@ func (d *Yun139) Init(ctx context.Context) error {
 
 		d.cron = cron.NewCron(time.Hour * 12)
 		d.cron.Do(func() {
-			err := d.refreshToken()
+			// err := d.refreshToken()
+			err := d.autoDailyTasks()
 			if err != nil {
 				log.Errorf("%+v", err)
 			}
