@@ -85,20 +85,26 @@ func (d *ChaoXing) List(ctx context.Context, dir model.Obj, args model.ListArgs)
 }
 
 func (d *ChaoXing) Link(ctx context.Context, file model.Obj, args model.LinkArgs) (*model.Link, error) {
+	if args.Redirect {
+		return &model.Link{
+			URL: fmt.Sprintf("https://sharewh.xuexi365.com/share/download/%s", file.GetID()),
+		}, nil
+	}
 	var resp DownResp
 	ua := d.conf.ua
-	fileId := strings.Split(file.GetID(), "$")[1]
-	_, err := d.requestDownload("/screen/note_note/files/status/"+fileId, http.MethodPost, func(req *resty.Request) {
-		req.SetHeader("User-Agent", ua)
+	_, err := d.requestDownload("/proxy/apis/common/fileStatus", http.MethodGet, func(req *resty.Request) {
+		req.SetHeader("User-Agent", ua).
+			SetQueryParams(map[string]string{
+				"crossOrigin": "true",
+				"objectId":    file.GetID(),
+			})
 	}, &resp)
 	if err != nil {
 		return nil, err
 	}
-	u := resp.Download
 	return &model.Link{
-		URL: u,
+		URL: resp.Download,
 		Header: http.Header{
-			"Cookie":     []string{d.Cookie},
 			"Referer":    []string{d.conf.referer},
 			"User-Agent": []string{ua},
 		},
