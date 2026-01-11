@@ -2,7 +2,6 @@ package chaoxing
 
 import (
 	"bytes"
-	"fmt"
 	"strconv"
 	"time"
 
@@ -267,7 +266,7 @@ func fileToObj(f File) *model.Object {
 	}
 	paserTime := time.UnixMilli(f.Content.UploadDate)
 	return &model.Object{
-		ID:       fmt.Sprintf("%d$%s", f.ID, f.Content.FileID),
+		ID:       f.Content.ObjectID,
 		Name:     f.Content.Name,
 		Size:     int64(f.Content.Size),
 		Modified: paserTime,
