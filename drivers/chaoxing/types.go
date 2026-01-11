@@ -204,12 +204,11 @@ type ListFileResp struct {
 }
 
 type DownResp struct {
-	Msg        string `json:"msg"`
-	Duration   int    `json:"duration"`
-	Download   string `json:"download"`
-	FileStatus string `json:"fileStatus"`
-	URL        string `json:"url"`
-	Status     bool   `json:"status"`
+	Msg    string `json:"msg"`
+	Result int    `json:"result"`
+	Data   struct {
+		Download string `json:"download"`
+	} `json:"data"`
 }
 
 type UploadDataRsp struct {
