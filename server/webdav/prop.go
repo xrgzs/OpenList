@@ -17,6 +17,7 @@ import (
 
 	"github.com/OpenListTeam/OpenList/v4/internal/conf"
 	"github.com/OpenListTeam/OpenList/v4/internal/model"
+	"github.com/OpenListTeam/OpenList/v4/internal/op"
 	"github.com/OpenListTeam/OpenList/v4/pkg/utils"
 	"github.com/OpenListTeam/OpenList/v4/server/common"
 )
@@ -152,6 +153,14 @@ var liveProps = map[xml.Name]struct {
 		// mechanism for directories, so we do not advertise getetag for DAV
 		// collections.
 		dir: false,
+	},
+	{Space: "DAV:", Local: "quota-available-bytes"}: {
+		findFn: findQuotaAvailableBytes,
+		dir:    true,
+	},
+	{Space: "DAV:", Local: "quota-used-bytes"}: {
+		findFn: findQuotaUsedBytes,
+		dir:    true,
 	},
 
 	// TODO: The lockdiscovery property requires LockSystem to list the
@@ -492,4 +501,22 @@ func findChecksums(ctx context.Context, ls LockSystem, name string, fi model.Obj
 		checksums += fmt.Sprintf("<checksum>%s:%s</checksum>", hashType.Name, hashValue)
 	}
 	return checksums, nil
+}
+
+func findQuotaAvailableBytes(ctx context.Context, ls LockSystem, name string, fi model.Obj) (string, error) {
+	storage, _, err := op.GetStorageAndActualPath(name)
+	details, err := op.GetStorageDetails(ctx, storage, false)
+	if err != nil {
+		return fmt.Sprint(details.FreeSpace()), nil
+	}
+	return "", nil
+}
+
+func findQuotaUsedBytes(ctx context.Context, ls LockSystem, name string, fi model.Obj) (string, error) {
+	storage, _, err := op.GetStorageAndActualPath(name)
+	details, err := op.GetStorageDetails(ctx, storage, false)
+	if err != nil {
+		return fmt.Sprint(details.UsedSpace), nil
+	}
+	return "", nil
 }
