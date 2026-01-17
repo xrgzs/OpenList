@@ -109,7 +109,7 @@ func (d *Onedrive) Link(ctx context.Context, file model.Obj, args model.LinkArgs
 	var u string
 	var err error
 	var duration time.Duration
-	if d.CreateShareLink {
+	if d.CreateShareLink && args.Redirect {
 		duration = 365 * 24 * time.Hour // cache 1 year
 		u, err = d.createLink(file.GetPath())
 		if err != nil {
