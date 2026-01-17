@@ -116,7 +116,6 @@ func (d *Onedrive) Link(ctx context.Context, file model.Obj, args model.LinkArgs
 			return nil, err
 		}
 	} else {
-		duration = 5 * time.Minute // cache 5 min
 		f, err := d.GetFile(file.GetPath())
 		if err != nil {
 			return nil, err
@@ -134,9 +133,14 @@ func (d *Onedrive) Link(ctx context.Context, file model.Obj, args model.LinkArgs
 		_u.Host = d.CustomHost
 		u = _u.String()
 	}
+	if duration > 0 {
+		return &model.Link{
+			URL:        u,
+			Expiration: &duration,
+		}, nil
+	}
 	return &model.Link{
-		URL:        u,
-		Expiration: &duration,
+		URL: u,
 	}, nil
 }
 
