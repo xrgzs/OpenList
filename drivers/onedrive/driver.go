@@ -133,6 +133,9 @@ func (d *Onedrive) Link(ctx context.Context, file model.Obj, args model.LinkArgs
 		_u.Host = d.CustomHost
 		u = _u.String()
 	}
+	if d.Addition.LinkExpireSeconds > 0 {
+		duration = time.Duration(d.Addition.LinkExpireSeconds) * time.Second
+	}
 	if duration > 0 {
 		return &model.Link{
 			URL:        u,
