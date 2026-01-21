@@ -204,6 +204,9 @@ func (d *Onedrive) createLink(path string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	if resp.Link.WebUrl == "" {
+		return "", fmt.Errorf("createLink returned empty webUrl")
+	}
 
 	p, err := url.Parse(resp.Link.WebUrl)
 	if err != nil {
@@ -211,35 +214,53 @@ func (d *Onedrive) createLink(path string) (string, error) {
 	}
 	// Do some transformations
 	q := url.Values{}
+	parts := splitSegs(p.Path)
 	if p.Host == "1drv.ms" {
 		// For personal
 		// https://1drv.ms/t/c/{user}/{share} ->
 		// https://my.microsoftpersonalcontent.com/personal/{user}/_layouts/15/download.aspx?share={share}
-		paths := strings.Split(p.Path, "/")
-		if len(paths) < 5 || paths[3] == "" || paths[4] == "" {
-			return "", fmt.Errorf("invalid onedrive short link")
+		if len(parts) < 2 {
+			return "", fmt.Errorf("invalid onedrive short link: %s", resp.Link.WebUrl)
 		}
-		user := paths[3]
-		share := paths[4]
+		// take last two segments as user and share when available
+		user := parts[len(parts)-2]
+		share := parts[len(parts)-1]
 		p.Host = "my.microsoftpersonalcontent.com"
 		p.Path = fmt.Sprintf("/personal/%s/_layouts/15/download.aspx", user)
 		q.Set("share", share)
-	} else if strings.Contains(p.Host, ".sharepoint.com") {
+	} else {
 		// https://{tenant}-my.sharepoint.com/:u:/g/personal/{user_email}/{share}
 		// https://{tenant}-my.sharepoint.com/personal/{user_email}/_layouts/15/download.aspx?share={share}
-		paths := strings.Split(p.Path, "/")
-		if len(paths) < 6 || paths[5] == "" {
-			return "", fmt.Errorf("invalid onedrive sharepoint link")
+		// Find the "personal" segment and extract user and share after it.
+		idx := -1
+		for i, s := range parts {
+			if s == "personal" {
+				idx = i
+				break
+			}
 		}
-		user := paths[4]
-		share := paths[5]
+		if idx == -1 || idx+2 >= len(parts) {
+			return "", fmt.Errorf("invalid onedrive sharepoint link: %s", resp.Link.WebUrl)
+		}
+		user := parts[idx+1]
+		share := parts[idx+2]
 		p.Path = fmt.Sprintf("/personal/%s/_layouts/15/download.aspx", user)
 		q.Set("share", share)
-	} else {
-		return "", fmt.Errorf("unsupported onedrive link host: %s", p.Host)
 	}
 	p.RawQuery = q.Encode()
 	return p.String(), nil
+}
+
+// splitSegs splits path into non-empty segments.
+func splitSegs(path string) []string {
+	raw := strings.Split(path, "/")
+	segs := make([]string, 0, len(raw))
+	for _, s := range raw {
+		if s != "" {
+			segs = append(segs, s)
+		}
+	}
+	return segs
 }
 
 func (d *Onedrive) upSmall(ctx context.Context, dstDir model.Obj, stream model.FileStreamer) error {
