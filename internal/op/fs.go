@@ -632,7 +632,7 @@ func Put(ctx context.Context, storage driver.Driver, dstDirPath string, file mod
 		} else if storage.Config().NoOverwriteUpload {
 			// try to rename old obj
 			err = Rename(ctx, storage, dstPath, tempName)
-			if err != nil && err != errs.ObjectAlreadyExists {
+			if err != nil && errs.IsObjectAlreadyExists(err) {
 				return err
 			}
 		} else {
