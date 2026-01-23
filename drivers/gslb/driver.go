@@ -197,7 +197,7 @@ func (d *Gslb) Link(ctx context.Context, file model.Obj, args model.LinkArgs) (*
 	// 按顺序依次尝试获取链接
 	for i, s := range sorted {
 		rp := path.Join(s.Path, file.GetPath())
-		link, _, err := func() (*model.Link, model.Obj, error) { // 为defer使用闭包
+		link, o, err := func() (*model.Link, model.Obj, error) { // 为defer使用闭包
 			var ctxChild context.Context
 			if d.Timeout > 0 {
 				var cancel context.CancelFunc
@@ -212,6 +212,10 @@ func (d *Gslb) Link(ctx context.Context, file model.Obj, args model.LinkArgs) (*
 			// 最后一个存储节点出错则返回错误
 			if i == len(sorted)-1 {
 				return nil, err
+			}
+			// 检查文件大小是否匹配
+			if d.Addition.CheckFileSize && o.GetSize() != file.GetSize() {
+				continue
 			}
 			continue
 		}
