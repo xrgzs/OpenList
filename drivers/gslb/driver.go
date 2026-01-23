@@ -228,8 +228,16 @@ func (d *Gslb) Link(ctx context.Context, file model.Obj, args model.LinkArgs) (*
 					sign.Sign(rp)),
 			}, nil
 		}
+		// 链接类型
 		resultLink := *link
-		resultLink.Expiration = nil
+		if len(s.Replace) > 0 {
+			// 进行链接替换
+			for rk, rv := range s.Replace {
+				// 只替换第一次出现的
+				resultLink.URL = strings.Replace(resultLink.URL, rk, rv, 1)
+			}
+		}
+		resultLink.Expiration = nil // 清空缓存时间
 		resultLink.SyncClosers = utils.NewSyncClosers(link)
 		return &resultLink, nil
 	}

@@ -25,6 +25,8 @@ type GslbStorage struct {
 	MinSize SizeSuffix `yaml:"min_size"`
 	// 过滤文件大小-大于该值的文件
 	MaxSize SizeSuffix `yaml:"max_size"`
+	// 链接替换
+	Replace map[string]string `yaml:"replace"`
 }
 
 // SizeSuffix 包装 rclone fs.SizeSuffix 以支持 YAML 序列化
