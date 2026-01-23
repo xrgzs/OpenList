@@ -7,8 +7,9 @@ import (
 
 type Addition struct {
 	driver.RootPath
-	Paths   string `json:"paths" type:"text" required:"true"`
-	Timeout int    `json:"timeout" type:"number" default:"5"`
+	Paths         string `json:"paths" type:"text" required:"true"`
+	Timeout       int    `json:"timeout" type:"number" default:"0"`
+	CheckFileSize bool   `json:"check_file_size" type:"bool" default:"false"`
 }
 
 var config = driver.Config{
