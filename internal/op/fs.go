@@ -470,7 +470,7 @@ func Rename(ctx context.Context, storage driver.Driver, srcPath, dstName string)
 		return errs.NotImplement
 	}
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	dirKey := Key(storage, stdpath.Dir(srcPath))
