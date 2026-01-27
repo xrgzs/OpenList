@@ -77,14 +77,13 @@ func (d *QuarkOrUC) MakeDir(ctx context.Context, parentDir model.Obj, dirName st
 		"file_name":     dirName,
 		"pdir_fid":      parentDir.GetID(),
 	}
-	resp := Resp{}
 	_, err := d.request("/file", http.MethodPost, func(req *resty.Request) {
 		req.SetBody(data)
-	}, &resp)
-	if err == nil || resp.Message == "file is doloading[存在同名文件]" || resp.Code == 23008 {
+	}, nil)
+	if err == nil || err.Error() == "file is doloading[同名冲突]" {
 		time.Sleep(time.Second)
 	}
-	if resp.Message == "file is doloading[存在同名文件]" || resp.Code == 23008 {
+	if err.Error() == "file is doloading[同名冲突]" {
 		return errs.ObjectAlreadyExists
 	}
 	return err
