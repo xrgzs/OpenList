@@ -322,10 +322,13 @@ func MakeDir(ctx context.Context, storage driver.Driver, path string) error {
 			return nil, errors.WithMessage(err, "failed to check if dir exists")
 		}
 		parentPath, dirName := stdpath.Split(path)
-		if err = MakeDir(ctx, storage, parentPath); err != nil && !errs.IsObjectAlreadyExists(err) {
+		if err = MakeDir(ctx, storage, parentPath); err != nil {
 			return nil, errors.WithMessagef(err, "failed to make parent dir [%s]", parentPath)
 		}
 		parentDir, err := GetUnwrap(ctx, storage, parentPath)
+		if parentPath != "/" && !parentDir.IsDir() {
+			return nil, errs.NotFolder
+		}
 		// this should not happen
 		if err != nil {
 			return nil, errors.WithMessagef(err, "failed to get parent dir [%s]", parentPath)
@@ -345,6 +348,9 @@ func MakeDir(ctx context.Context, storage driver.Driver, path string) error {
 		}
 		if err != nil && !errs.IsObjectAlreadyExists(err) {
 			return nil, errors.WithStack(err)
+		}
+		if newObj != nil && !newObj.IsDir() {
+			return nil, errors.WithStack(errs.NotFolder)
 		}
 		if storage.Config().NoCache {
 			return nil, nil
