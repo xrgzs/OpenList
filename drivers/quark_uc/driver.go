@@ -83,7 +83,7 @@ func (d *QuarkOrUC) MakeDir(ctx context.Context, parentDir model.Obj, dirName st
 	if err == nil || err.Error() == "file is doloading[同名冲突]" {
 		time.Sleep(time.Second)
 	}
-	if err.Error() == "file is doloading[同名冲突]" {
+	if err != nil && err.Error() == "file is doloading[同名冲突]" {
 		return errs.ObjectAlreadyExists
 	}
 	return err

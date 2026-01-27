@@ -326,7 +326,7 @@ func MakeDir(ctx context.Context, storage driver.Driver, path string) error {
 			return nil, errors.WithMessagef(err, "failed to make parent dir [%s]", parentPath)
 		}
 		parentDir, err := GetUnwrap(ctx, storage, parentPath)
-		if parentPath != "/" && !parentDir.IsDir() {
+		if !parentDir.IsDir() {
 			return nil, errs.NotFolder
 		}
 		// this should not happen
@@ -348,9 +348,6 @@ func MakeDir(ctx context.Context, storage driver.Driver, path string) error {
 		}
 		if err != nil && !errs.IsObjectAlreadyExists(err) {
 			return nil, errors.WithStack(err)
-		}
-		if newObj != nil && !newObj.IsDir() {
-			return nil, errors.WithStack(errs.NotFolder)
 		}
 		if storage.Config().NoCache {
 			return nil, nil
