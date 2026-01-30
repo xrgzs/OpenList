@@ -326,12 +326,12 @@ func MakeDir(ctx context.Context, storage driver.Driver, path string) error {
 			return nil, errors.WithMessagef(err, "failed to make parent dir [%s]", parentPath)
 		}
 		parentDir, err := GetUnwrap(ctx, storage, parentPath)
-		if !parentDir.IsDir() {
-			return nil, errs.NotFolder
-		}
 		// this should not happen
 		if err != nil {
 			return nil, errors.WithMessagef(err, "failed to get parent dir [%s]", parentPath)
+		}
+		if !parentDir.IsDir() {
+			return nil, errs.NotFolder
 		}
 		if model.ObjHasMask(parentDir, model.NoWrite) {
 			return nil, errors.WithStack(errs.PermissionDenied)
