@@ -46,29 +46,38 @@ func (d *CloudreveV4) getUA() string {
 	return base.UserAgent
 }
 
-func (d *CloudreveV4) request(method string, path string, callback base.ReqCallback, out any) error {
-	if d.ref != nil {
-		return d.ref.request(method, path, callback, out)
-	}
-
-	// ensure token
-	if d.isTokenExpired() {
-		err := d.refreshToken()
+func (d *CloudreveV4) request(ctx context.Context, method string, path string, callback base.ReqCallback, out any) error {
+	// limit qps
+	if d.limiter != nil {
+		err := d.limiter.Wait(ctx)
 		if err != nil {
 			return err
 		}
 	}
 
-	return d._request(method, path, callback, out)
+	if d.ref != nil {
+		return d.ref.request(ctx, method, path, callback, out)
+	}
+
+	// ensure token
+	if d.isTokenExpired() {
+		err := d.refreshToken(ctx)
+		if err != nil {
+			return err
+		}
+	}
+
+	return d._request(ctx, method, path, callback, out)
 }
 
-func (d *CloudreveV4) _request(method string, path string, callback base.ReqCallback, out any) error {
+func (d *CloudreveV4) _request(ctx context.Context, method string, path string, callback base.ReqCallback, out any) error {
 	if d.ref != nil {
-		return d.ref._request(method, path, callback, out)
+		return d.ref._request(ctx, method, path, callback, out)
 	}
 
 	u := d.Address + "/api/v4" + path
 	req := base.RestyClient.R()
+	req.SetContext(ctx)
 	req.SetHeaders(map[string]string{
 		"Accept":     "application/json, text/plain, */*",
 		"User-Agent": d.getUA(),
@@ -94,11 +103,11 @@ func (d *CloudreveV4) _request(method string, path string, callback base.ReqCall
 
 	if r.Code != 0 {
 		if r.Code == CodeLoginRequired && d.canLogin() && path != "/session/token/refresh" {
-			err = d.login()
+			err = d.login(ctx)
 			if err != nil {
 				return err
 			}
-			return d.request(method, path, callback, out)
+			return d.request(ctx, method, path, callback, out)
 		}
 		if r.Code == CodeCredentialInvalid {
 			return ErrorIssueToken
@@ -128,14 +137,14 @@ func (d *CloudreveV4) canLogin() bool {
 	return d.Username != "" && d.Password != ""
 }
 
-func (d *CloudreveV4) login() error {
+func (d *CloudreveV4) login(ctx context.Context) error {
 	var siteConfig SiteLoginConfigResp
-	err := d._request(http.MethodGet, "/site/config/login", nil, &siteConfig)
+	err := d._request(ctx, http.MethodGet, "/site/config/login", nil, &siteConfig)
 	if err != nil {
 		return err
 	}
 	var prepareLogin PrepareLoginResp
-	err = d._request(http.MethodGet, "/session/prepare?email="+d.Addition.Username, nil, &prepareLogin)
+	err = d._request(ctx, http.MethodGet, "/session/prepare?email="+d.Addition.Username, nil, &prepareLogin)
 	if err != nil {
 		return err
 	}
@@ -146,7 +155,7 @@ func (d *CloudreveV4) login() error {
 		return errors.New("webauthn not support")
 	}
 	for range 5 {
-		err = d.doLogin(siteConfig.LoginCaptcha)
+		err = d.doLogin(ctx, siteConfig.LoginCaptcha)
 		if err == nil {
 			break
 		}
@@ -157,7 +166,7 @@ func (d *CloudreveV4) login() error {
 	return err
 }
 
-func (d *CloudreveV4) doLogin(needCaptcha bool) error {
+func (d *CloudreveV4) doLogin(ctx context.Context, needCaptcha bool) error {
 	var err error
 	loginBody := base.Json{
 		"email":    d.Username,
@@ -165,7 +174,7 @@ func (d *CloudreveV4) doLogin(needCaptcha bool) error {
 	}
 	if needCaptcha {
 		var config BasicConfigResp
-		err = d._request(http.MethodGet, "/site/config/basic", nil, &config)
+		err = d._request(ctx, http.MethodGet, "/site/config/basic", nil, &config)
 		if err != nil {
 			return err
 		}
@@ -173,7 +182,7 @@ func (d *CloudreveV4) doLogin(needCaptcha bool) error {
 			return fmt.Errorf("captcha type %s not support", config.CaptchaType)
 		}
 		var captcha CaptchaResp
-		err = d._request(http.MethodGet, "/site/captcha", nil, &captcha)
+		err = d._request(ctx, http.MethodGet, "/site/captcha", nil, &captcha)
 		if err != nil {
 			return err
 		}
@@ -199,7 +208,7 @@ func (d *CloudreveV4) doLogin(needCaptcha bool) error {
 		loginBody["captcha"] = captchaCode
 	}
 	var token TokenResponse
-	err = d._request(http.MethodPost, "/session/token", func(req *resty.Request) {
+	err = d._request(ctx, http.MethodPost, "/session/token", func(req *resty.Request) {
 		req.SetBody(loginBody)
 	}, &token)
 	if err != nil {
@@ -211,11 +220,11 @@ func (d *CloudreveV4) doLogin(needCaptcha bool) error {
 	return nil
 }
 
-func (d *CloudreveV4) refreshToken() error {
+func (d *CloudreveV4) refreshToken(ctx context.Context) error {
 	// if no refresh token, try to login if possible
 	if d.RefreshToken == "" {
 		if d.canLogin() {
-			err := d.login()
+			err := d.login(ctx)
 			if err != nil {
 				return fmt.Errorf("cannot login to get refresh token, error: %s", err)
 			}
@@ -229,7 +238,7 @@ func (d *CloudreveV4) refreshToken() error {
 	if err != nil {
 		// if refresh token is invalid, try to login if possible
 		if d.canLogin() {
-			return d.login()
+			return d.login(ctx)
 		}
 		d.GetStorage().SetStatus(fmt.Sprintf("Invalid RefreshToken: %s", err.Error()))
 		op.MustSaveDriverStorage(d)
@@ -238,7 +247,7 @@ func (d *CloudreveV4) refreshToken() error {
 
 	// do refresh token
 	var token Token
-	err = d._request(http.MethodPost, "/session/token/refresh", func(req *resty.Request) {
+	err = d._request(ctx, http.MethodPost, "/session/token/refresh", func(req *resty.Request) {
 		req.SetBody(base.Json{
 			"refresh_token": d.RefreshToken,
 		})
@@ -247,7 +256,7 @@ func (d *CloudreveV4) refreshToken() error {
 		if errors.Is(err, ErrorIssueToken) {
 			if d.canLogin() {
 				// try to login again
-				return d.login()
+				return d.login(ctx)
 			}
 			d.GetStorage().SetStatus("This session is no longer valid")
 			op.MustSaveDriverStorage(d)
@@ -364,7 +373,7 @@ func (d *CloudreveV4) upLocal(ctx context.Context, file model.FileStreamer, u Fi
 		if err != nil {
 			return err
 		}
-		err = d.request(http.MethodPost, "/file/upload/"+u.SessionID+"/"+strconv.Itoa(chunk), func(req *resty.Request) {
+		err = d.request(ctx, http.MethodPost, "/file/upload/"+u.SessionID+"/"+strconv.Itoa(chunk), func(req *resty.Request) {
 			req.SetHeader("Content-Type", "application/octet-stream")
 			req.SetContentLength(true)
 			req.SetHeader("Content-Length", strconv.FormatInt(byteSize, 10))
@@ -529,7 +538,7 @@ func (d *CloudreveV4) upOneDrive(ctx context.Context, file model.FileStreamer, u
 		up(float64(finish) * 100 / float64(file.GetSize()))
 	}
 	// 上传成功发送回调请求
-	return d.request(http.MethodPost, "/callback/onedrive/"+u.SessionID+"/"+u.CallbackSecret, func(req *resty.Request) {
+	return d.request(ctx, http.MethodPost, "/callback/onedrive/"+u.SessionID+"/"+u.CallbackSecret, func(req *resty.Request) {
 		req.SetBody("{}")
 	}, nil)
 }
@@ -634,5 +643,5 @@ func (d *CloudreveV4) upS3(ctx context.Context, file model.FileStreamer, u FileU
 	}
 
 	// 上传成功发送回调请求
-	return d.request(http.MethodGet, "/callback/"+s3Type+"/"+u.SessionID+"/"+u.CallbackSecret, nil, nil)
+	return d.request(ctx, http.MethodGet, "/callback/"+s3Type+"/"+u.SessionID+"/"+u.CallbackSecret, nil, nil)
 }

@@ -10,18 +10,19 @@ type Addition struct {
 	driver.RootPath
 	// driver.RootID
 	// define other
-	Address             string `json:"address" required:"true"`
-	Username            string `json:"username"`
-	Password            string `json:"password"`
-	AccessToken         string `json:"access_token"`
-	RefreshToken        string `json:"refresh_token"`
-	CustomUA            string `json:"custom_ua"`
-	EnableFolderSize    bool   `json:"enable_folder_size"`
-	EnableThumb         bool   `json:"enable_thumb"`
-	EnableVersionUpload bool   `json:"enable_version_upload"`
-	HideUploading       bool   `json:"hide_uploading"`
-	OrderBy             string `json:"order_by" type:"select" options:"name,size,updated_at,created_at" default:"name" required:"true"`
-	OrderDirection      string `json:"order_direction" type:"select" options:"asc,desc" default:"asc" required:"true"`
+	Address             string  `json:"address" required:"true"`
+	Username            string  `json:"username"`
+	Password            string  `json:"password"`
+	AccessToken         string  `json:"access_token"`
+	RefreshToken        string  `json:"refresh_token"`
+	CustomUA            string  `json:"custom_ua"`
+	EnableFolderSize    bool    `json:"enable_folder_size"`
+	EnableThumb         bool    `json:"enable_thumb"`
+	EnableVersionUpload bool    `json:"enable_version_upload"`
+	HideUploading       bool    `json:"hide_uploading"`
+	OrderBy             string  `json:"order_by" type:"select" options:"name,size,updated_at,created_at" default:"name" required:"true"`
+	OrderDirection      string  `json:"order_direction" type:"select" options:"asc,desc" default:"asc" required:"true"`
+	LimitRate           float64 `json:"limit_rate" type:"float" default:"4" help:"limit all api request rate ([limit]r/1s)"`
 }
 
 var config = driver.Config{

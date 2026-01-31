@@ -15,6 +15,7 @@ import (
 	"github.com/OpenListTeam/OpenList/v4/internal/op"
 	"github.com/OpenListTeam/OpenList/v4/pkg/utils"
 	"github.com/go-resty/resty/v2"
+	"golang.org/x/time/rate"
 )
 
 type CloudreveV4 struct {
@@ -23,6 +24,7 @@ type CloudreveV4 struct {
 	ref            *CloudreveV4
 	AccessExpires  string
 	RefreshExpires string
+	limiter        *rate.Limiter
 }
 
 func (d *CloudreveV4) Config() driver.Config {
@@ -42,15 +44,19 @@ func (d *CloudreveV4) GetAddition() driver.Additional {
 func (d *CloudreveV4) Init(ctx context.Context) error {
 	// removing trailing slash
 	d.Address = strings.TrimSuffix(d.Address, "/")
+	// initialize rate limiter
+	if d.LimitRate > 0 {
+		d.limiter = rate.NewLimiter(rate.Limit(d.LimitRate), 1)
+	}
 	op.MustSaveDriverStorage(d)
 	if d.ref != nil {
 		return nil
 	}
 	if d.canLogin() {
-		return d.login()
+		return d.login(ctx)
 	}
 	if d.RefreshToken != "" {
-		return d.refreshToken()
+		return d.refreshToken(ctx)
 	}
 	if d.AccessToken == "" {
 		return errors.New("no way to authenticate. At least AccessToken is required")
@@ -86,7 +92,7 @@ func (d *CloudreveV4) List(ctx context.Context, dir model.Obj, args model.ListAr
 	}
 
 	for {
-		err := d.request(http.MethodGet, "/file", func(req *resty.Request) {
+		err := d.request(ctx, http.MethodGet, "/file", func(req *resty.Request) {
 			req.SetQueryParams(params)
 		}, &r)
 		if err != nil {
@@ -108,7 +114,7 @@ func (d *CloudreveV4) List(ctx context.Context, dir model.Obj, args model.ListAr
 	return utils.SliceConvert(f, func(src File) (model.Obj, error) {
 		if d.EnableFolderSize && src.Type == 1 {
 			var ds FolderSummaryResp
-			err := d.request(http.MethodGet, "/file/info", func(req *resty.Request) {
+			err := d.request(ctx, http.MethodGet, "/file/info", func(req *resty.Request) {
 				req.SetQueryParam("uri", src.Path)
 				req.SetQueryParam("folder_summary", "true")
 			}, &ds)
@@ -119,7 +125,7 @@ func (d *CloudreveV4) List(ctx context.Context, dir model.Obj, args model.ListAr
 		var thumb model.Thumbnail
 		if d.EnableThumb && src.Type == 0 && (src.Metadata == nil || src.Metadata[MetadataThumbDisabled] == "") {
 			var t FileThumbResp
-			err := d.request(http.MethodGet, "/file/thumb", func(req *resty.Request) {
+			err := d.request(ctx, http.MethodGet, "/file/thumb", func(req *resty.Request) {
 				req.SetQueryParam("uri", src.Path)
 			}, &t)
 			if err == nil && t.URL != "" {
@@ -137,7 +143,7 @@ func (d *CloudreveV4) List(ctx context.Context, dir model.Obj, args model.ListAr
 
 func (d *CloudreveV4) Get(ctx context.Context, path string) (model.Obj, error) {
 	var info File
-	err := d.request(http.MethodGet, "/file/info", func(req *resty.Request) {
+	err := d.request(ctx, http.MethodGet, "/file/info", func(req *resty.Request) {
 		req.SetQueryParam("uri", d.RootFolderPath+path)
 	}, &info)
 	if err != nil {
@@ -148,7 +154,7 @@ func (d *CloudreveV4) Get(ctx context.Context, path string) (model.Obj, error) {
 
 func (d *CloudreveV4) Link(ctx context.Context, file model.Obj, args model.LinkArgs) (*model.Link, error) {
 	var url FileUrlResp
-	err := d.request(http.MethodPost, "/file/url", func(req *resty.Request) {
+	err := d.request(ctx, http.MethodPost, "/file/url", func(req *resty.Request) {
 		req.SetBody(base.Json{
 			"uris":     []string{file.GetPath()},
 			"download": true,
@@ -168,7 +174,7 @@ func (d *CloudreveV4) Link(ctx context.Context, file model.Obj, args model.LinkA
 }
 
 func (d *CloudreveV4) MakeDir(ctx context.Context, parentDir model.Obj, dirName string) error {
-	return d.request(http.MethodPost, "/file/create", func(req *resty.Request) {
+	return d.request(ctx, http.MethodPost, "/file/create", func(req *resty.Request) {
 		req.SetBody(base.Json{
 			"type":              "folder",
 			"uri":               parentDir.GetPath() + "/" + dirName,
@@ -178,7 +184,7 @@ func (d *CloudreveV4) MakeDir(ctx context.Context, parentDir model.Obj, dirName 
 }
 
 func (d *CloudreveV4) Move(ctx context.Context, srcObj, dstDir model.Obj) error {
-	return d.request(http.MethodPost, "/file/move", func(req *resty.Request) {
+	return d.request(ctx, http.MethodPost, "/file/move", func(req *resty.Request) {
 		req.SetBody(base.Json{
 			"uris": []string{srcObj.GetPath()},
 			"dst":  dstDir.GetPath(),
@@ -188,7 +194,7 @@ func (d *CloudreveV4) Move(ctx context.Context, srcObj, dstDir model.Obj) error 
 }
 
 func (d *CloudreveV4) Rename(ctx context.Context, srcObj model.Obj, newName string) error {
-	return d.request(http.MethodPost, "/file/rename", func(req *resty.Request) {
+	return d.request(ctx, http.MethodPost, "/file/rename", func(req *resty.Request) {
 		req.SetBody(base.Json{
 			"new_name": newName,
 			"uri":      srcObj.GetPath(),
@@ -197,7 +203,7 @@ func (d *CloudreveV4) Rename(ctx context.Context, srcObj model.Obj, newName stri
 }
 
 func (d *CloudreveV4) Copy(ctx context.Context, srcObj, dstDir model.Obj) error {
-	return d.request(http.MethodPost, "/file/move", func(req *resty.Request) {
+	return d.request(ctx, http.MethodPost, "/file/move", func(req *resty.Request) {
 		req.SetBody(base.Json{
 			"uris": []string{srcObj.GetPath()},
 			"dst":  dstDir.GetPath(),
@@ -208,7 +214,7 @@ func (d *CloudreveV4) Copy(ctx context.Context, srcObj, dstDir model.Obj) error 
 
 func (d *CloudreveV4) Remove(ctx context.Context, obj model.Obj) error {
 	var r FileDeleteResp
-	err := d.request(http.MethodDelete, "/file", func(req *resty.Request) {
+	err := d.request(ctx, http.MethodDelete, "/file", func(req *resty.Request) {
 		req.SetBody(base.Json{
 			"uris":             []string{obj.GetPath()},
 			"unlink":           false,
@@ -227,7 +233,7 @@ func (d *CloudreveV4) Remove(ctx context.Context, obj model.Obj) error {
 		for _, item := range r.Data {
 			tokens = append(tokens, item.Token)
 		}
-		err = d.request(http.MethodDelete, "/file/lock", func(req *resty.Request) {
+		err = d.request(ctx, http.MethodDelete, "/file/lock", func(req *resty.Request) {
 			req.SetBody(base.Json{
 				"tokens": tokens,
 			})
@@ -235,7 +241,7 @@ func (d *CloudreveV4) Remove(ctx context.Context, obj model.Obj) error {
 		if err != nil {
 			return err
 		}
-		return d.request(http.MethodDelete, "/file", func(req *resty.Request) {
+		return d.request(ctx, http.MethodDelete, "/file", func(req *resty.Request) {
 			req.SetBody(base.Json{
 				"uris":             []string{obj.GetPath()},
 				"unlink":           false,
@@ -249,7 +255,7 @@ func (d *CloudreveV4) Remove(ctx context.Context, obj model.Obj) error {
 func (d *CloudreveV4) Put(ctx context.Context, dstDir model.Obj, file model.FileStreamer, up driver.UpdateProgress) error {
 	if file.GetSize() == 0 {
 		// 空文件使用新建文件方法，避免上传卡锁
-		return d.request(http.MethodPost, "/file/create", func(req *resty.Request) {
+		return d.request(ctx, http.MethodPost, "/file/create", func(req *resty.Request) {
 			req.SetBody(base.Json{
 				"type":              "file",
 				"uri":               dstDir.GetPath() + "/" + file.GetName(),
@@ -268,7 +274,7 @@ func (d *CloudreveV4) Put(ctx context.Context, dstDir model.Obj, file model.File
 		"order_direction": "asc",
 		"page":            "0",
 	}
-	err = d.request(http.MethodGet, "/file", func(req *resty.Request) {
+	err = d.request(ctx, http.MethodGet, "/file", func(req *resty.Request) {
 		req.SetQueryParams(params)
 	}, &r)
 	if err != nil {
@@ -285,7 +291,7 @@ func (d *CloudreveV4) Put(ctx context.Context, dstDir model.Obj, file model.File
 	if d.EnableVersionUpload {
 		body["entity_type"] = "version"
 	}
-	err = d.request(http.MethodPut, "/file/upload", func(req *resty.Request) {
+	err = d.request(ctx, http.MethodPut, "/file/upload", func(req *resty.Request) {
 		req.SetBody(body)
 	}, &u)
 	if err != nil {
@@ -311,7 +317,7 @@ func (d *CloudreveV4) Put(ctx context.Context, dstDir model.Obj, file model.File
 	}
 	if err != nil {
 		// 删除失败的会话
-		_ = d.request(http.MethodDelete, "/file/upload", func(req *resty.Request) {
+		_ = d.request(ctx, http.MethodDelete, "/file/upload", func(req *resty.Request) {
 			req.SetBody(base.Json{
 				"id":  u.SessionID,
 				"uri": u.URI,
@@ -347,9 +353,7 @@ func (d *CloudreveV4) ArchiveDecompress(ctx context.Context, srcObj, dstDir mode
 func (d *CloudreveV4) GetDetails(ctx context.Context) (*model.StorageDetails, error) {
 	// TODO return storage details (total space, free space, etc.)
 	var r CapacityResp
-	err := d.request(http.MethodGet, "/user/capacity", func(req *resty.Request) {
-		req.SetContext(ctx)
-	}, &r)
+	err := d.request(ctx, http.MethodGet, "/user/capacity", nil, &r)
 	if err != nil {
 		return nil, err
 	}
