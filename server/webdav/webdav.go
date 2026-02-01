@@ -81,10 +81,11 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			status, err = h.handleUnlock(brw, r)
 		case "PROPFIND":
 			status, err = h.handlePropfind(brw, r)
+			// fuck xhofe, waste my 1TB traffic below because errors never return:
 			// if there is a error for PROPFIND, we should be as an empty folder to the client
-			if err != nil {
-				status = http.StatusNotFound
-			}
+			// if err != nil {
+			// 	status = http.StatusNotFound
+			// }
 		case "PROPPATCH":
 			status, err = h.handleProppatch(brw, r)
 		}
@@ -662,7 +663,7 @@ func (h *Handler) handlePropfind(w http.ResponseWriter, r *http.Request) (status
 		if errs.IsNotFoundError(err) {
 			return http.StatusNotFound, err
 		}
-		return http.StatusMethodNotAllowed, err
+		return http.StatusInternalServerError, err
 	}
 	depth := infiniteDepth
 	if hdr := r.Header.Get("Depth"); hdr != "" {
@@ -740,7 +741,7 @@ func (h *Handler) handleProppatch(w http.ResponseWriter, r *http.Request) (statu
 		if errs.IsObjectNotFound(err) {
 			return http.StatusNotFound, err
 		}
-		return http.StatusMethodNotAllowed, err
+		return http.StatusInternalServerError, err
 	}
 	patches, status, err := readProppatch(r.Body)
 	if err != nil {
