@@ -38,6 +38,7 @@ const (
 
 var (
 	ErrorIssueToken = errors.New("failed to issue token")
+	ErrorBusy       = errors.New("driver is busy")
 )
 
 func (d *CloudreveV4) getUA() string {
@@ -64,6 +65,7 @@ func (d *CloudreveV4) request(method string, path string, callback base.ReqCallb
 }
 
 func (d *CloudreveV4) _request(method string, path string, callback base.ReqCallback, out any) error {
+
 	if d.ref != nil {
 		return d.ref._request(method, path, callback, out)
 	}
@@ -91,6 +93,11 @@ func (d *CloudreveV4) _request(method string, path string, callback base.ReqCall
 	}
 	if !resp.IsSuccess() {
 		return errors.New(resp.String())
+	}
+	if !strings.Contains(resp.Header().Get("Content-Type"), "application/json") {
+		return errors.New("invalid content type: " + resp.Header().Get("Content-Type"))
+	} else {
+		d.isBusy.Store(false)
 	}
 
 	if r.Code != 0 {
@@ -639,4 +646,15 @@ func (d *CloudreveV4) upS3(ctx context.Context, file model.FileStreamer, u FileU
 
 	// 上传成功发送回调请求
 	return d.request(http.MethodGet, "/callback/"+s3Type+"/"+u.SessionID+"/"+u.CallbackSecret, nil, nil)
+}
+
+// retryContentTypeError 确保content-type为json，避免部分cdn返回200的html导致同步失败
+// NOTE: List无需加锁，因为List确保是singleflight的
+func (d *CloudreveV4) retryContentTypeError(r *resty.Response, err error) bool {
+	if !strings.Contains(r.Header().Get("Content-Type"), "application/json") {
+		d.isBusy.Store(true)
+		time.Sleep(3 * time.Second)
+		return true
+	}
+	return false
 }
