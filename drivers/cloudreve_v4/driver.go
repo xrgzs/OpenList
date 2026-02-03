@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/OpenListTeam/OpenList/v4/drivers/base"
@@ -23,6 +24,7 @@ type CloudreveV4 struct {
 	ref            *CloudreveV4
 	AccessExpires  string
 	RefreshExpires string
+	isBusy         atomic.Bool
 }
 
 func (d *CloudreveV4) Config() driver.Config {
@@ -91,6 +93,7 @@ func (d *CloudreveV4) List(ctx context.Context, dir model.Obj, args model.ListAr
 	for {
 		err := d.request(http.MethodGet, "/file", func(req *resty.Request) {
 			req.SetQueryParams(params)
+			req.AddRetryCondition(d.retryContentTypeError)
 		}, &r)
 		if err != nil {
 			return nil, err
@@ -142,6 +145,7 @@ func (d *CloudreveV4) Get(ctx context.Context, path string) (model.Obj, error) {
 	var info File
 	err := d.request(http.MethodGet, "/file/info", func(req *resty.Request) {
 		req.SetQueryParam("uri", d.RootFolderPath+path)
+		req.AddRetryCondition(d.retryContentTypeError)
 	}, &info)
 	if err != nil {
 		return nil, err
@@ -171,6 +175,9 @@ func (d *CloudreveV4) Link(ctx context.Context, file model.Obj, args model.LinkA
 }
 
 func (d *CloudreveV4) MakeDir(ctx context.Context, parentDir model.Obj, dirName string) error {
+	if d.isBusy.Load() {
+		return ErrorBusy
+	}
 	return d.request(http.MethodPost, "/file/create", func(req *resty.Request) {
 		req.SetBody(base.Json{
 			"type":              "folder",
@@ -181,6 +188,9 @@ func (d *CloudreveV4) MakeDir(ctx context.Context, parentDir model.Obj, dirName 
 }
 
 func (d *CloudreveV4) Move(ctx context.Context, srcObj, dstDir model.Obj) error {
+	if d.isBusy.Load() {
+		return ErrorBusy
+	}
 	return d.request(http.MethodPost, "/file/move", func(req *resty.Request) {
 		req.SetBody(base.Json{
 			"uris": []string{srcObj.GetPath()},
@@ -191,6 +201,9 @@ func (d *CloudreveV4) Move(ctx context.Context, srcObj, dstDir model.Obj) error 
 }
 
 func (d *CloudreveV4) Rename(ctx context.Context, srcObj model.Obj, newName string) error {
+	if d.isBusy.Load() {
+		return ErrorBusy
+	}
 	return d.request(http.MethodPost, "/file/rename", func(req *resty.Request) {
 		req.SetBody(base.Json{
 			"new_name": newName,
@@ -200,6 +213,9 @@ func (d *CloudreveV4) Rename(ctx context.Context, srcObj model.Obj, newName stri
 }
 
 func (d *CloudreveV4) Copy(ctx context.Context, srcObj, dstDir model.Obj) error {
+	if d.isBusy.Load() {
+		return ErrorBusy
+	}
 	return d.request(http.MethodPost, "/file/move", func(req *resty.Request) {
 		req.SetBody(base.Json{
 			"uris": []string{srcObj.GetPath()},
@@ -210,6 +226,9 @@ func (d *CloudreveV4) Copy(ctx context.Context, srcObj, dstDir model.Obj) error 
 }
 
 func (d *CloudreveV4) Remove(ctx context.Context, obj model.Obj) error {
+	if d.isBusy.Load() {
+		return ErrorBusy
+	}
 	var r FileDeleteResp
 	err := d.request(http.MethodDelete, "/file", func(req *resty.Request) {
 		req.SetBody(base.Json{
@@ -250,6 +269,9 @@ func (d *CloudreveV4) Remove(ctx context.Context, obj model.Obj) error {
 }
 
 func (d *CloudreveV4) Put(ctx context.Context, dstDir model.Obj, file model.FileStreamer, up driver.UpdateProgress) error {
+	if d.isBusy.Load() {
+		return ErrorBusy
+	}
 	if file.GetSize() == 0 {
 		// 空文件使用新建文件方法，避免上传卡锁
 		return d.request(http.MethodPost, "/file/create", func(req *resty.Request) {
