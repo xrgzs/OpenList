@@ -143,12 +143,18 @@ func (d *OpenList) Link(ctx context.Context, file model.Obj, args model.LinkArgs
 		resp.Data.RawURL = strings.Replace(resp.Data.RawURL, d.Address, d.Cdn, 1)
 	}
 	var exp time.Duration
+	now := time.Now()
 	// 设置直链缓存时间为列表缓存时间
 	// exp = time.Minute * time.Duration(d.GetStorage().CacheExpiration)
 
-	// 从直链中获取缓存时间
-	u, err := url.Parse(resp.Data.RawURL)
-	if err == nil {
+	if resp.Data.Time != nil && resp.Data.Expiration != nil {
+		// 直接从接口返回的时间中获取剩余缓存时间
+		exp = *resp.Data.Expiration
+	} else if u, err := url.Parse(resp.Data.RawURL); err == nil {
+		// 从直链参数中计算出缓存时间
+		if resp.Data.Time != nil {
+			now = *resp.Data.Time
+		}
 		q := u.Query()
 		switch resp.Data.Provider {
 		case "Doubao", "DoubaoShare":
@@ -157,7 +163,8 @@ func (d *OpenList) Link(ctx context.Context, file model.Obj, args model.LinkArgs
 			if xExpires != "" {
 				t, err := strconv.ParseInt(xExpires, 10, 64)
 				if err == nil {
-					exp = time.Until(time.Unix(t, 0))
+					expTime := time.Unix(t, 0)
+					exp = expTime.Sub(now)
 				}
 			}
 		case "189Cloud", "189CloudTV", "189CloudPC":
@@ -166,7 +173,8 @@ func (d *OpenList) Link(ctx context.Context, file model.Obj, args model.LinkArgs
 			if xExpires != "" {
 				t, err := strconv.ParseInt(xExpires, 10, 64)
 				if err == nil {
-					exp = time.Until(time.Unix(t, 0))
+					expTime := time.Unix(t, 0)
+					exp = expTime.Sub(now)
 				}
 			}
 		default:
@@ -178,7 +186,7 @@ func (d *OpenList) Link(ctx context.Context, file model.Obj, args model.LinkArgs
 				if err == nil {
 					expires, err := time.ParseDuration(amzExpires + "s")
 					if err == nil {
-						exp = time.Until(t.Add(expires))
+						exp = t.Add(expires).Sub(now)
 					}
 				}
 			}
@@ -192,6 +200,7 @@ func (d *OpenList) Link(ctx context.Context, file model.Obj, args model.LinkArgs
 		return &model.Link{
 			URL:        resp.Data.RawURL,
 			Expiration: &exp,
+			Time:       &now,
 		}, nil
 	}
 	return &model.Link{

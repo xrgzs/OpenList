@@ -262,6 +262,10 @@ func Link(ctx context.Context, storage driver.Driver, path string, args model.Li
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed get link")
 		}
+		if link.Time == nil {
+			now := time.Now()
+			link.Time = &now
+		}
 		ol := &objWithLink{link: link, obj: file}
 		if link.Expiration != nil {
 			Cache.linkCache.SetTypeWithTTL(key, typeKey, ol, *link.Expiration)
