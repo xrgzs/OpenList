@@ -41,10 +41,12 @@ type FsGetReq struct {
 
 type FsGetResp struct {
 	ObjResp
-	RawURL   string    `json:"raw_url"`
-	Readme   string    `json:"readme"`
-	Provider string    `json:"provider"`
-	Related  []ObjResp `json:"related"`
+	RawURL     string         `json:"raw_url"`
+	Time       *time.Time     `json:"time"`
+	Expiration *time.Duration `json:"expiration"`
+	Readme     string         `json:"readme"`
+	Provider   string         `json:"provider"`
+	Related    []ObjResp      `json:"related"`
 }
 
 type MkdirOrLinkReq struct {
