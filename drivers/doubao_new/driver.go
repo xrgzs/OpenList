@@ -418,26 +418,17 @@ func (d *DoubaoNew) Put(ctx context.Context, dstDir model.Obj, file model.FileSt
 	}, nil
 }
 
-func (d *DoubaoNew) GetArchiveMeta(ctx context.Context, obj model.Obj, args model.ArchiveArgs) (model.ArchiveMeta, error) {
-	// TODO get archive file meta-info, return errs.NotImplement to use an internal archive tool, optional
-	return nil, errs.NotImplement
-}
-
-func (d *DoubaoNew) ListArchive(ctx context.Context, obj model.Obj, args model.ArchiveInnerArgs) ([]model.Obj, error) {
-	// TODO list args.InnerPath in the archive obj, return errs.NotImplement to use an internal archive tool, optional
-	return nil, errs.NotImplement
-}
-
-func (d *DoubaoNew) Extract(ctx context.Context, obj model.Obj, args model.ArchiveInnerArgs) (*model.Link, error) {
-	// TODO return link of file args.InnerPath in the archive obj, return errs.NotImplement to use an internal archive tool, optional
-	return nil, errs.NotImplement
-}
-
-func (d *DoubaoNew) ArchiveDecompress(ctx context.Context, srcObj, dstDir model.Obj, args model.ArchiveDecompressArgs) ([]model.Obj, error) {
-	// TODO extract args.InnerPath path in the archive srcObj to the dstDir location, optional
-	// a folder with the same name as the archive file needs to be created to store the extracted results if args.PutIntoNewDir
-	// return errs.NotImplement to use an internal archive tool
-	return nil, errs.NotImplement
+func (d *DoubaoNew) GetDetails(ctx context.Context) (*model.StorageDetails, error) {
+	data, err := d.getUserStorage(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return &model.StorageDetails{
+		DiskUsage: model.DiskUsage{
+			TotalSpace: data.TotalSizeLimitBytes,
+			UsedSpace:  data.UsedSizeBytes,
+		},
+	}, nil
 }
 
 func (d *DoubaoNew) Other(ctx context.Context, args model.OtherArgs) (interface{}, error) {
