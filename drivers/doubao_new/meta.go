@@ -12,7 +12,6 @@ type Addition struct {
 	Authorization string `json:"authorization" help:"DPoP access token (Authorization header value); optional if present in cookie"`
 	Dpop          string `json:"dpop" help:"DPoP header value; optional if present in cookie"`
 	Cookie        string `json:"cookie" help:"Optional cookie; only used to extract authorization/dpop tokens"`
-	Debug         bool   `json:"debug" help:"Enable debug logs for upload"`
 }
 
 var config = driver.Config{
