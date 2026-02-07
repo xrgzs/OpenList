@@ -31,7 +31,6 @@ func (d *DoubaoNew) request(ctx context.Context, path string, method string, cal
 	req.SetHeader("accept", "*/*")
 	req.SetHeader("origin", "https://www.doubao.com")
 	req.SetHeader("referer", "https://www.doubao.com/")
-	req.SetHeader("user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36")
 	if auth := d.resolveAuthorization(); auth != "" {
 		req.SetHeader("authorization", auth)
 	}
@@ -212,7 +211,6 @@ func (d *DoubaoNew) createFolder(ctx context.Context, parentToken, name string) 
 		req.SetHeader("accept", "*/*")
 		req.SetHeader("origin", "https://www.doubao.com")
 		req.SetHeader("referer", "https://www.doubao.com/")
-		req.SetHeader("user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36")
 		if auth := d.resolveAuthorization(); auth != "" {
 			req.SetHeader("authorization", auth)
 		}
@@ -292,7 +290,6 @@ func (d *DoubaoNew) renameFolder(ctx context.Context, token, name string) error 
 		req.SetHeader("accept", "*/*")
 		req.SetHeader("origin", "https://www.doubao.com")
 		req.SetHeader("referer", "https://www.doubao.com/")
-		req.SetHeader("user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36")
 		if auth := d.resolveAuthorization(); auth != "" {
 			req.SetHeader("authorization", auth)
 		}
@@ -415,7 +412,6 @@ func (d *DoubaoNew) moveObj(ctx context.Context, srcToken, destToken string) err
 		req.SetHeader("accept", "*/*")
 		req.SetHeader("origin", "https://www.doubao.com")
 		req.SetHeader("referer", "https://www.doubao.com/")
-		req.SetHeader("user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36")
 		if auth := d.resolveAuthorization(); auth != "" {
 			req.SetHeader("authorization", auth)
 		}
@@ -451,7 +447,6 @@ func (d *DoubaoNew) removeObj(ctx context.Context, tokens []string) error {
 		req.SetHeader("accept", "application/json, text/plain, */*")
 		req.SetHeader("origin", "https://www.doubao.com")
 		req.SetHeader("referer", "https://www.doubao.com/")
-		req.SetHeader("user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36")
 		if auth := d.resolveAuthorization(); auth != "" {
 			req.SetHeader("authorization", auth)
 		}
@@ -506,7 +501,6 @@ func (d *DoubaoNew) getUserStorage(ctx context.Context) (UserStorageData, error)
 	req.SetHeader("accept", "*/*")
 	req.SetHeader("origin", "https://www.doubao.com")
 	req.SetHeader("referer", "https://www.doubao.com/")
-	req.SetHeader("user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36")
 	req.SetHeader("agw-js-conv", "str")
 	req.SetHeader("content-type", "application/json")
 	if auth := d.resolveAuthorization(); auth != "" {
@@ -586,7 +580,6 @@ func (d *DoubaoNew) getTaskStatus(ctx context.Context, taskID string) (TaskStatu
 	req.SetHeader("accept", "application/json, text/plain, */*")
 	req.SetHeader("origin", "https://www.doubao.com")
 	req.SetHeader("referer", "https://www.doubao.com/")
-	req.SetHeader("user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36")
 	if auth := d.resolveAuthorization(); auth != "" {
 		req.SetHeader("authorization", auth)
 	}
@@ -722,7 +715,6 @@ func (d *DoubaoNew) mergeUploadBlocks(ctx context.Context, uploadID string, seqL
 	req.SetHeader("accept", "application/json, text/plain, */*")
 	req.SetHeader("origin", "https://www.doubao.com")
 	req.SetHeader("referer", "https://www.doubao.com/")
-	req.SetHeader("user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36")
 	req.SetHeader("rpc-persist-doubao-pan", "true")
 	req.SetHeader("content-type", "application/octet-stream")
 	req.Header.Set("x-block-list-checksum", checksumHeader)
@@ -832,7 +824,6 @@ func (d *DoubaoNew) uploadBlockV3(ctx context.Context, uploadID string, block Up
 	req.SetHeader("accept", "*/*")
 	req.SetHeader("origin", "https://www.doubao.com")
 	req.SetHeader("referer", "https://www.doubao.com/")
-	req.SetHeader("user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36")
 	req.SetHeader("rpc-persist-doubao-pan", "true")
 	req.SetHeader("x-block-seq", strconv.Itoa(block.Seq))
 	req.SetHeader("x-block-checksum", block.Checksum)
