@@ -726,7 +726,6 @@ func (d *DoubaoNew) mergeUploadBlocks(ctx context.Context, uploadID string, seqL
 	if dpop := d.resolveDpop(); dpop != "" {
 		req.SetHeader("dpop", dpop)
 	}
-	req.Header.Del("Cookie")
 	req.Header.Del("cookie")
 	if req.Header.Get("x-command") == "" {
 		return UploadMergeData{}, fmt.Errorf("[doubao_new] merge blocks missing x-command header")
