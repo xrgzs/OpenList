@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/OpenListTeam/OpenList/v4/drivers/base"
+	"github.com/OpenListTeam/OpenList/v4/pkg/cookie"
 	"github.com/go-resty/resty/v2"
 )
 
@@ -81,18 +82,6 @@ func (d *DoubaoNew) request(ctx context.Context, path string, method string, cal
 	return body, nil
 }
 
-func getCookieValue(cookie, name string) string {
-	parts := strings.Split(cookie, ";")
-	prefix := name + "="
-	for _, part := range parts {
-		part = strings.TrimSpace(part)
-		if strings.HasPrefix(part, prefix) {
-			return strings.TrimPrefix(part, prefix)
-		}
-	}
-	return ""
-}
-
 func adler32String(data []byte) string {
 	sum := adler32.Checksum(data)
 	return strconv.FormatUint(uint64(sum), 10)
@@ -129,7 +118,7 @@ func previewList(items []string, n int) string {
 func (d *DoubaoNew) resolveAuthorization() string {
 	auth := strings.TrimSpace(d.Authorization)
 	if auth == "" && d.Cookie != "" {
-		if token := getCookieValue(d.Cookie, "LARK_SUITE_ACCESS_TOKEN"); token != "" {
+		if token := cookie.GetStr(d.Cookie, "LARK_SUITE_ACCESS_TOKEN"); token != "" {
 			auth = token
 		}
 	}
@@ -145,7 +134,7 @@ func (d *DoubaoNew) resolveAuthorization() string {
 func (d *DoubaoNew) resolveDpop() string {
 	dpop := strings.TrimSpace(d.Dpop)
 	if dpop == "" && d.Cookie != "" {
-		dpop = getCookieValue(d.Cookie, "LARK_SUITE_DPOP")
+		dpop = cookie.GetStr(d.Cookie, "LARK_SUITE_DPOP")
 	}
 	return dpop
 }
@@ -347,11 +336,11 @@ func extractCsrfTokenFromResponse(res *resty.Response) string {
 		return ""
 	}
 	if res.Request.RawRequest != nil {
-		if csrf := getCookieValue(res.Request.RawRequest.Header.Get("Cookie"), "_csrf_token"); csrf != "" {
+		if csrf := cookie.GetStr(res.Request.RawRequest.Header.Get("Cookie"), "_csrf_token"); csrf != "" {
 			return csrf
 		}
 	}
-	if csrf := getCookieValue(res.Request.Header.Get("Cookie"), "_csrf_token"); csrf != "" {
+	if csrf := cookie.GetStr(res.Request.Header.Get("Cookie"), "_csrf_token"); csrf != "" {
 		return csrf
 	}
 	for _, c := range res.Cookies() {
