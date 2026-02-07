@@ -3,6 +3,7 @@ package doubao_new
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"hash/adler32"
 	"net/http"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	"github.com/OpenListTeam/OpenList/v4/drivers/base"
+	"github.com/OpenListTeam/OpenList/v4/internal/model"
 	"github.com/OpenListTeam/OpenList/v4/pkg/cookie"
 	"github.com/go-resty/resty/v2"
 )
@@ -112,6 +114,17 @@ func previewList(items []string, n int) string {
 	return strings.Join(items[:n], ",")
 }
 
+func parseSize(size string) int64 {
+	if size == "" {
+		return 0
+	}
+	val, err := strconv.ParseInt(size, 10, 64)
+	if err != nil {
+		return 0
+	}
+	return val
+}
+
 func (d *DoubaoNew) resolveAuthorization() string {
 	auth := strings.TrimSpace(d.Authorization)
 	if auth == "" && d.Cookie != "" {
@@ -165,6 +178,41 @@ func (d *DoubaoNew) listChildren(ctx context.Context, parentToken string, lastLa
 	return resp.Data, nil
 }
 
+func (d *DoubaoNew) listAllChildren(ctx context.Context, parentToken string) ([]Node, error) {
+	nodes := make([]Node, 0, 50)
+	lastLabel := ""
+	for page := 0; page < 100; page++ {
+		data, err := d.listChildren(ctx, parentToken, lastLabel)
+		if err != nil {
+			return nil, err
+		}
+
+		if len(data.NodeList) > 0 {
+			for _, token := range data.NodeList {
+				node, ok := data.Entities.Nodes[token]
+				if !ok {
+					continue
+				}
+				nodes = append(nodes, node)
+			}
+		} else {
+			for _, node := range data.Entities.Nodes {
+				nodes = append(nodes, node)
+			}
+		}
+
+		if !data.HasMore || data.LastLabel == "" || data.LastLabel == lastLabel {
+			break
+		}
+		lastLabel = data.LastLabel
+	}
+
+	if len(nodes) == 0 {
+		return nil, nil
+	}
+	return nodes, nil
+}
+
 func (d *DoubaoNew) getFileInfo(ctx context.Context, fileToken string) (FileInfo, error) {
 	var resp FileInfoResp
 	_, err := d.request(ctx, "/space/api/box/file/info/", http.MethodPost, func(req *resty.Request) {
@@ -181,6 +229,67 @@ func (d *DoubaoNew) getFileInfo(ctx context.Context, fileToken string) (FileInfo
 	}
 
 	return resp.Data, nil
+}
+
+func (d *DoubaoNew) previewLink(ctx context.Context, obj *Object, args model.LinkArgs) (*model.Link, error) {
+	auth := d.resolveAuthorization()
+	dpop := d.resolveDpop()
+	if auth == "" || dpop == "" {
+		return nil, errors.New("missing authorization or dpop")
+	}
+	if obj.ObjToken == "" {
+		return nil, errors.New("missing obj_token")
+	}
+	info, err := d.getFileInfo(ctx, obj.ObjToken)
+	if err != nil {
+		return nil, err
+	}
+
+	entry, ok := info.PreviewMeta.Data["22"]
+	if !ok || entry.Status != 0 {
+		return nil, errors.New("preview not available")
+	}
+
+	subID := ""
+	pageIndex := 0
+
+	if subID == "" {
+		imgExt := ".webp"
+		pageNums := 0
+		if entry.Extra != "" {
+			var extra PreviewImageExtra
+			if err := json.Unmarshal([]byte(entry.Extra), &extra); err == nil {
+				if extra.ImgExt != "" {
+					imgExt = extra.ImgExt
+				}
+				pageNums = extra.PageNums
+			}
+		}
+		if pageNums > 0 && pageIndex >= pageNums {
+			pageIndex = pageNums - 1
+		}
+		subID = fmt.Sprintf("img_%d%s", pageIndex, imgExt)
+	}
+
+	query := url.Values{}
+	query.Set("preview_type", "22")
+	query.Set("sub_id", subID)
+	if info.Version != "" {
+		query.Set("version", info.Version)
+	}
+	previewURL := fmt.Sprintf("%s/space/api/box/stream/download/preview_sub/%s?%s", BaseURL, obj.ObjToken, query.Encode())
+
+	headers := http.Header{
+		"Referer":       []string{"https://www.doubao.com/"},
+		"User-Agent":    []string{base.UserAgent},
+		"Authorization": []string{auth},
+		"Dpop":          []string{dpop},
+	}
+
+	return &model.Link{
+		URL:    previewURL,
+		Header: headers,
+	}, nil
 }
 
 func (d *DoubaoNew) createFolder(ctx context.Context, parentToken, name string) (Node, error) {

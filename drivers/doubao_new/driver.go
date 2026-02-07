@@ -12,7 +12,6 @@ import (
 	"net/http"
 	"net/url"
 	"sort"
-	"strconv"
 	"time"
 
 	"github.com/OpenListTeam/OpenList/v4/drivers/base"
@@ -469,113 +468,6 @@ func (d *DoubaoNew) Other(ctx context.Context, args model.OtherArgs) (interface{
 	default:
 		return nil, errs.NotSupport
 	}
-}
-
-func (d *DoubaoNew) listAllChildren(ctx context.Context, parentToken string) ([]Node, error) {
-	nodes := make([]Node, 0, 50)
-	lastLabel := ""
-	for page := 0; page < 100; page++ {
-		data, err := d.listChildren(ctx, parentToken, lastLabel)
-		if err != nil {
-			return nil, err
-		}
-
-		if len(data.NodeList) > 0 {
-			for _, token := range data.NodeList {
-				node, ok := data.Entities.Nodes[token]
-				if !ok {
-					continue
-				}
-				nodes = append(nodes, node)
-			}
-		} else {
-			for _, node := range data.Entities.Nodes {
-				nodes = append(nodes, node)
-			}
-		}
-
-		if !data.HasMore || data.LastLabel == "" || data.LastLabel == lastLabel {
-			break
-		}
-		lastLabel = data.LastLabel
-	}
-
-	if len(nodes) == 0 {
-		return nil, nil
-	}
-	return nodes, nil
-}
-
-func (d *DoubaoNew) previewLink(ctx context.Context, obj *Object, args model.LinkArgs) (*model.Link, error) {
-	auth := d.resolveAuthorization()
-	dpop := d.resolveDpop()
-	if auth == "" || dpop == "" {
-		return nil, errors.New("missing authorization or dpop")
-	}
-	if obj.ObjToken == "" {
-		return nil, errors.New("missing obj_token")
-	}
-	info, err := d.getFileInfo(ctx, obj.ObjToken)
-	if err != nil {
-		return nil, err
-	}
-
-	entry, ok := info.PreviewMeta.Data["22"]
-	if !ok || entry.Status != 0 {
-		return nil, errors.New("preview not available")
-	}
-
-	subID := ""
-	pageIndex := 0
-
-	if subID == "" {
-		imgExt := ".webp"
-		pageNums := 0
-		if entry.Extra != "" {
-			var extra PreviewImageExtra
-			if err := json.Unmarshal([]byte(entry.Extra), &extra); err == nil {
-				if extra.ImgExt != "" {
-					imgExt = extra.ImgExt
-				}
-				pageNums = extra.PageNums
-			}
-		}
-		if pageNums > 0 && pageIndex >= pageNums {
-			pageIndex = pageNums - 1
-		}
-		subID = fmt.Sprintf("img_%d%s", pageIndex, imgExt)
-	}
-
-	query := url.Values{}
-	query.Set("preview_type", "22")
-	query.Set("sub_id", subID)
-	if info.Version != "" {
-		query.Set("version", info.Version)
-	}
-	previewURL := fmt.Sprintf("%s/space/api/box/stream/download/preview_sub/%s?%s", BaseURL, obj.ObjToken, query.Encode())
-
-	headers := http.Header{
-		"Referer":       []string{"https://www.doubao.com/"},
-		"User-Agent":    []string{base.UserAgent},
-		"Authorization": []string{auth},
-		"Dpop":          []string{dpop},
-	}
-
-	return &model.Link{
-		URL:    previewURL,
-		Header: headers,
-	}, nil
-}
-
-func parseSize(size string) int64 {
-	if size == "" {
-		return 0
-	}
-	val, err := strconv.ParseInt(size, 10, 64)
-	if err != nil {
-		return 0
-	}
-	return val
 }
 
 var _ driver.Driver = (*DoubaoNew)(nil)
