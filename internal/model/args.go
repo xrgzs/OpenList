@@ -40,6 +40,8 @@ type Link struct {
 	utils.SyncClosers `json:"-"`
 	// 如果SyncClosers中的资源被关闭后Link将不可用，则此值应为 true
 	RequireReference bool `json:"-"`
+
+	Time *time.Time // link 生成时间，留空则为获取时自动生成
 }
 
 type OtherArgs struct {
