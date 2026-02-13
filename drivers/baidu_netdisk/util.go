@@ -207,13 +207,13 @@ func (d *BaiduNetdisk) linkOfficial(file model.Obj, _ model.LinkArgs) (*model.Li
 		return nil, err
 	}
 	u := fmt.Sprintf("%s&access_token=%s", resp.List[0].Dlink, d.AccessToken)
-	res, err := base.NoRedirectClient.R().SetHeader("User-Agent", "pan.baidu.com").Head(u)
-	if err != nil {
-		return nil, err
-	}
-	// if res.StatusCode() == 302 {
-	u = res.Header().Get("location")
-	//}
+	// res, err := base.NoRedirectClient.R().SetHeader("User-Agent", "pan.baidu.com").Head(u)
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// // if res.StatusCode() == 302 {
+	// u = res.Header().Get("location")
+	// //}
 
 	return &model.Link{
 		URL: u,
