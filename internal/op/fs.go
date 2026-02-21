@@ -262,6 +262,10 @@ func Link(ctx context.Context, storage driver.Driver, path string, args model.Li
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed get link")
 		}
+		if link.Time == nil {
+			now := time.Now()
+			link.Time = &now
+		}
 		ol := &objWithLink{link: link, obj: file}
 		if link.Expiration != nil {
 			Cache.linkCache.SetTypeWithTTL(key, typeKey, ol, *link.Expiration)
@@ -330,6 +334,9 @@ func MakeDir(ctx context.Context, storage driver.Driver, path string) error {
 		if err != nil {
 			return nil, errors.WithMessagef(err, "failed to get parent dir [%s]", parentPath)
 		}
+		if !parentDir.IsDir() {
+			return nil, errs.NotFolder
+		}
 		if model.ObjHasMask(parentDir, model.NoWrite) {
 			return nil, errors.WithStack(errs.PermissionDenied)
 		}
@@ -343,7 +350,7 @@ func MakeDir(ctx context.Context, storage driver.Driver, path string) error {
 		default:
 			return nil, errs.NotImplement
 		}
-		if err != nil {
+		if err != nil && !errs.IsObjectAlreadyExists(err) {
 			return nil, errors.WithStack(err)
 		}
 		if storage.Config().NoCache {
@@ -640,7 +647,7 @@ func Put(ctx context.Context, storage driver.Driver, dstDirPath string, file mod
 		}
 	}
 	err = MakeDir(ctx, storage, dstDirPath)
-	if err != nil {
+	if err != nil && !errs.IsObjectAlreadyExists(err) {
 		return errors.WithMessagef(err, "failed to make dir [%s]", dstDirPath)
 	}
 	parentDir, err := GetUnwrap(ctx, storage, dstDirPath)

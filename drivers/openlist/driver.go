@@ -7,10 +7,11 @@ import (
 	"net/http"
 	"net/url"
 	"path"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/OpenListTeam/OpenList/v4/drivers/base"
-	"github.com/OpenListTeam/OpenList/v4/internal/conf"
 	"github.com/OpenListTeam/OpenList/v4/internal/driver"
 	"github.com/OpenListTeam/OpenList/v4/internal/errs"
 	"github.com/OpenListTeam/OpenList/v4/internal/model"
@@ -56,17 +57,17 @@ func (d *OpenList) Init(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	if resp.Data.Role == model.GUEST {
-		u := d.Address + "/api/public/settings"
-		res, err := base.RestyClient.R().Get(u)
-		if err != nil {
-			return err
-		}
-		allowMounted := utils.Json.Get(res.Body(), "data", conf.AllowMounted).ToString() == "true"
-		if !allowMounted {
-			return fmt.Errorf("the site does not allow mounted")
-		}
-	}
+	// if resp.Data.Role == model.GUEST {
+	// 	u := d.Address + "/api/public/settings"
+	// 	res, err := base.RestyClient.R().Get(u)
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// 	allowMounted := utils.Json.Get(res.Body(), "data", conf.AllowMounted).ToString() == "true"
+	// 	if !allowMounted {
+	// 		return fmt.Errorf("the site does not allow mounted")
+	// 	}
+	// }
 	return err
 }
 
@@ -77,7 +78,7 @@ func (d *OpenList) Drop(ctx context.Context) error {
 func (d *OpenList) List(ctx context.Context, dir model.Obj, args model.ListArgs) ([]model.Obj, error) {
 	var resp common.Resp[FsListResp]
 	_, _, err := d.request("/fs/list", http.MethodPost, func(req *resty.Request) {
-		req.SetResult(&resp).SetBody(ListReq{
+		req.SetContext(ctx).SetResult(&resp).SetBody(ListReq{
 			PageReq: model.PageReq{
 				Page:    1,
 				PerPage: 0,
@@ -130,13 +131,77 @@ func (d *OpenList) Link(ctx context.Context, file model.Obj, args model.LinkArgs
 		}
 	}
 	_, _, err := d.request("/fs/get", http.MethodPost, func(req *resty.Request) {
-		req.SetResult(&resp).SetBody(FsGetReq{
+		req.SetContext(ctx).SetResult(&resp).SetBody(FsGetReq{
 			Path:     file.GetPath(),
 			Password: d.MetaPassword,
 		}).SetHeaders(headers)
 	})
 	if err != nil {
 		return nil, err
+	}
+	if d.Cdn != "" {
+		resp.Data.RawURL = strings.Replace(resp.Data.RawURL, d.Address, d.Cdn, 1)
+	}
+	var exp time.Duration
+	now := time.Now()
+	// 设置直链缓存时间为列表缓存时间
+	// exp = time.Minute * time.Duration(d.GetStorage().CacheExpiration)
+
+	if resp.Data.Time != nil && resp.Data.Expiration != nil {
+		// 直接从接口返回的时间中获取剩余缓存时间
+		exp = *resp.Data.Expiration
+	} else if u, err := url.Parse(resp.Data.RawURL); err == nil {
+		// 从直链参数中计算出缓存时间
+		if resp.Data.Time != nil {
+			now = *resp.Data.Time
+		}
+		q := u.Query()
+		switch resp.Data.Provider {
+		case "Doubao", "DoubaoShare":
+			// x-expires
+			xExpires := q.Get("x-expires") // in Unix timestamp (seconds)
+			if xExpires != "" {
+				t, err := strconv.ParseInt(xExpires, 10, 64)
+				if err == nil {
+					expTime := time.Unix(t, 0)
+					exp = expTime.Sub(now)
+				}
+			}
+		case "189Cloud", "189CloudTV", "189CloudPC":
+			// Expires
+			xExpires := q.Get("Expires") // in Unix timestamp (seconds)
+			if xExpires != "" {
+				t, err := strconv.ParseInt(xExpires, 10, 64)
+				if err == nil {
+					expTime := time.Unix(t, 0)
+					exp = expTime.Sub(now)
+				}
+			}
+		default:
+			// S3 直链格式（X-Amz-Date、X-Amz-Expires）
+			amzDate := q.Get("X-Amz-Date")       // in ISO 8601
+			amzExpires := q.Get("X-Amz-Expires") // in TTL
+			if amzDate != "" && amzExpires != "" {
+				t, err := time.Parse("20060102T150405Z", amzDate)
+				if err == nil {
+					expires, err := time.ParseDuration(amzExpires + "s")
+					if err == nil {
+						exp = t.Add(expires).Sub(now)
+					}
+				}
+			}
+		}
+		// 乘以系数 0.8，避免失效
+		// 避免 exp 小于 0
+		exp = max(time.Duration(float64(exp)*0.8), 0)
+	}
+
+	if exp > 0 {
+		return &model.Link{
+			URL:        resp.Data.RawURL,
+			Expiration: &exp,
+			Time:       &now,
+		}, nil
 	}
 	return &model.Link{
 		URL: resp.Data.RawURL,
