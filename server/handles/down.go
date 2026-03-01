@@ -2,7 +2,9 @@ package handles
 
 import (
 	"errors"
+	"fmt"
 	stdpath "path"
+	"time"
 
 	"github.com/OpenListTeam/OpenList/v4/internal/conf"
 	"github.com/OpenListTeam/OpenList/v4/internal/driver"
@@ -88,6 +90,19 @@ func redirect(c *gin.Context, link *model.Link) {
 			common.ErrorPage(c, err, 500)
 			return
 		}
+	}
+	if link.Expiration != nil {
+		c.Header("X-Op-Cache-Lookup", "HIT")
+		// 缓存过期时长
+		c.Header("X-Op-Cache-Expire", fmt.Sprintf("%d", int(link.Expiration.Seconds())))
+		if link.Time != nil {
+			// 缓存有效剩余TTL
+			expTime := link.Time.Add(*link.Expiration)
+			ttl := time.Until(expTime)
+			c.Header("X-Op-Cache-TTL", fmt.Sprintf("%d", int(ttl.Seconds())))
+		}
+	} else {
+		c.Header("X-Op-Cache-Lookup", "BYPASS")
 	}
 	c.Redirect(302, link.URL)
 }
