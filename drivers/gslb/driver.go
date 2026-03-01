@@ -213,9 +213,12 @@ func (d *Gslb) Link(ctx context.Context, file model.Obj, args model.LinkArgs) (*
 			if i == len(sorted)-1 {
 				return nil, err
 			}
-			// 检查文件大小是否匹配
-			if d.Addition.CheckFileSize && o.GetSize() != file.GetSize() {
-				continue
+			continue
+		}
+		// 检查文件大小是否匹配
+		if d.Addition.CheckFileSize && o.GetSize() != file.GetSize() {
+			if i == len(sorted)-1 {
+				return nil, fmt.Errorf("file size mismatch: expected %d, got %d", file.GetSize(), o.GetSize())
 			}
 			continue
 		}
