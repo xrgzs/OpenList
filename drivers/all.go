@@ -50,6 +50,7 @@ import (
 	_ "github.com/OpenListTeam/OpenList/v4/drivers/mega"
 	_ "github.com/OpenListTeam/OpenList/v4/drivers/misskey"
 	_ "github.com/OpenListTeam/OpenList/v4/drivers/mopan"
+	_ "github.com/OpenListTeam/OpenList/v4/drivers/msfiles"
 	_ "github.com/OpenListTeam/OpenList/v4/drivers/netease_music"
 	_ "github.com/OpenListTeam/OpenList/v4/drivers/onedrive"
 	_ "github.com/OpenListTeam/OpenList/v4/drivers/onedrive_app"
