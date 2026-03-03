@@ -6,6 +6,7 @@ import (
 	"fmt"
 	stdpath "path"
 	"strconv"
+	"time"
 
 	"github.com/OpenListTeam/OpenList/v4/internal/conf"
 	"github.com/OpenListTeam/OpenList/v4/internal/driver"
@@ -41,7 +42,11 @@ func Down(c *gin.Context) {
 			Redirect: true,
 		})
 		if err != nil {
-			common.ErrorPage(c, err, 500)
+			if errs.IsNotFoundError(err) {
+				common.ErrorPage(c, err, 404)
+			} else {
+				common.ErrorPage(c, err, 500)
+			}
 			return
 		}
 		redirect(c, link)
@@ -68,7 +73,11 @@ func Proxy(c *gin.Context) {
 			Type:   c.Query("type"),
 		})
 		if err != nil {
-			common.ErrorPage(c, err, 500)
+			if errs.IsNotFoundError(err) {
+				common.ErrorPage(c, err, 404)
+			} else {
+				common.ErrorPage(c, err, 500)
+			}
 			return
 		}
 		proxy(c, link, file, storage.GetStorage().ProxyRange)
@@ -93,6 +102,19 @@ func redirect(c *gin.Context, link *model.Link) {
 			common.ErrorPage(c, err, 500)
 			return
 		}
+	}
+	if link.Expiration != nil {
+		c.Header("X-Op-Cache-Lookup", "HIT")
+		// 缓存过期时长
+		c.Header("X-Op-Cache-Expire", fmt.Sprintf("%d", int(link.Expiration.Seconds())))
+		if link.Time != nil {
+			// 缓存有效剩余TTL
+			expTime := link.Time.Add(*link.Expiration)
+			ttl := time.Until(expTime)
+			c.Header("X-Op-Cache-TTL", fmt.Sprintf("%d", int(ttl.Seconds())))
+		}
+	} else {
+		c.Header("X-Op-Cache-Lookup", "BYPASS")
 	}
 	c.Redirect(302, link.URL)
 }
