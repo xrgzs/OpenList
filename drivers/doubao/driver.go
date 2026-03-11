@@ -92,7 +92,24 @@ func (d *Doubao) List(ctx context.Context, dir model.Obj, args model.ListArgs) (
 		return nil, err
 	}
 
+	seen := make(map[string]bool)
 	for _, child := range fileList {
+		// 去重，仅保留第一个重名文件，其余的都删除
+		name := child.Name
+		if seen[name] {
+			// 已经有同名文件，删除当前 child
+			go func(obj model.Obj) {
+				utils.Log.Warnf("[doubao] start removing duplicate object: %s, id: %s", obj.GetName(), obj.GetID())
+				if err := d.Remove(context.Background(), obj); err != nil {
+					utils.Log.Warnf("[doubao] failed to remove duplicate object: %s, id: %s, err: %v", obj.GetName(), obj.GetID(), err)
+				}
+			}(&model.Object{
+				Name: child.Name,
+				ID:   child.ID,
+			})
+			continue
+		}
+		seen[name] = true
 		files = append(files, &Object{
 			Object: model.Object{
 				ID:       child.ID,

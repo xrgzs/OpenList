@@ -33,10 +33,12 @@ const (
 	CodeLoginRequired     = http.StatusUnauthorized
 	CodePathNotExist      = 40016 // Path not exist
 	CodeCredentialInvalid = 40020 // Failed to issue token
+	CodeObjectExisted     = 40004 // Object existed
 )
 
 var (
 	ErrorIssueToken = errors.New("failed to issue token")
+	ErrorBusy       = errors.New("driver is busy")
 )
 
 func (d *CloudreveV4) getUA() string {
@@ -91,6 +93,12 @@ func (d *CloudreveV4) _request(method string, path string, callback base.ReqCall
 	if !resp.IsSuccess() {
 		return errors.New(resp.String())
 	}
+	// The CDN sometimes returns HTTP 200 with an HTML body instead of JSON.
+	if !strings.Contains(resp.Header().Get("Content-Type"), "application/json") {
+		return errors.New("invalid content type: " + resp.Header().Get("Content-Type"))
+	}
+	// indicate not busy
+	d.isBusy.Store(false)
 
 	if r.Code != 0 {
 		if r.Code == CodeLoginRequired && d.canLogin() && path != "/session/token/refresh" {
@@ -105,6 +113,9 @@ func (d *CloudreveV4) _request(method string, path string, callback base.ReqCall
 		}
 		if r.Code == CodePathNotExist {
 			return errs.ObjectNotFound
+		}
+		if r.Code == CodeObjectExisted {
+			return errs.ObjectAlreadyExists
 		}
 		return fmt.Errorf("%d: %s", r.Code, r.Msg)
 	}
@@ -635,4 +646,16 @@ func (d *CloudreveV4) upS3(ctx context.Context, file model.FileStreamer, u FileU
 
 	// 上传成功发送回调请求
 	return d.request(http.MethodGet, "/callback/"+s3Type+"/"+u.SessionID+"/"+u.CallbackSecret, nil, nil)
+}
+
+// retryContentTypeError 确保content-type为json，避免部分cdn返回200的html导致同步失败
+func (d *CloudreveV4) retryContentTypeError(r *resty.Response, err error) bool {
+	if err != nil || r == nil {
+		return false
+	}
+	if !strings.Contains(r.Header().Get("Content-Type"), "application/json") {
+		d.isBusy.Store(true)
+		return true
+	}
+	return false
 }
