@@ -11,16 +11,15 @@ type Addition struct {
 	// driver.RootID
 	// define other
 	// Field string `json:"field" type:"select" required:"true" options:"a,b,c" default:"a"`
-	Surl         string `json:"surl"`
-	Pwd          string `json:"pwd"`
-	BDUSS        string `json:"BDUSS"`
-	TransferPath string `json:"trasfer_path" default:"/"`
+	Surl string `json:"surl"`
+	Pwd  string `json:"pwd"`
 }
 
 var config = driver.Config{
-	Name:      "BaiduShare",
-	LocalSort: true,
-	NoUpload:  true,
+	Name:          "BaiduShare",
+	LocalSort:     true,
+	NoUpload:      true,
+	LinkCacheMode: driver.LinkCacheIP | driver.LinkCacheUA,
 }
 
 func init() {

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -195,7 +196,19 @@ func (d *BaiduNetdisk) getFiles(dir string) ([]File, error) {
 	return res, nil
 }
 
-func (d *BaiduNetdisk) linkOfficial(file model.Obj, _ model.LinkArgs) (*model.Link, error) {
+func (d *BaiduNetdisk) EnsureUA(args model.LinkArgs) error {
+	if strings.Contains(args.Header.Get("User-Agent"), "Mozilla") {
+		return fmt.Errorf("redirect not supported for User-Agent containing Mozilla, please change User-Agent")
+	}
+	return nil
+}
+
+func (d *BaiduNetdisk) linkOfficial(file model.Obj, args model.LinkArgs) (*model.Link, error) {
+	if args.Redirect {
+		if err := d.EnsureUA(args); err != nil {
+			return nil, err
+		}
+	}
 	var resp DownloadResp
 	params := map[string]string{
 		"method": "filemetas",
@@ -207,19 +220,38 @@ func (d *BaiduNetdisk) linkOfficial(file model.Obj, _ model.LinkArgs) (*model.Li
 		return nil, err
 	}
 	u := fmt.Sprintf("%s&access_token=%s", resp.List[0].Dlink, d.AccessToken)
-	// res, err := base.NoRedirectClient.R().SetHeader("User-Agent", "pan.baidu.com").Head(u)
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// // if res.StatusCode() == 302 {
-	// u = res.Header().Get("location")
-	// //}
-
+	req := base.NoRedirectClient.R()
+	req.SetHeader("User-Agent", "pan.baidu.com")
+	req.SetDoNotParseResponse(true)
+	res, err := req.Get(u)
+	if err != nil {
+		return nil, err
+	}
+	_ = res.RawResponse.Body.Close()
+	if (res.StatusCode() == 302 || res.StatusCode() == 307 || res.StatusCode() == 308) && res.Header().Get("location") != "" {
+		u = res.Header().Get("location")
+	} else {
+		return nil, fmt.Errorf("redirect failed, status: %d", res.StatusCode())
+	}
+	// 上面接口返回8小时
+	var exp = time.Hour * 8
+	_dl, err := url.Parse(resp.List[0].Dlink)
+	if err == nil {
+		q := _dl.Query()
+		expires := q.Get("expires") // like "8h"
+		if strings.HasSuffix(expires, "h") {
+			hours, err := strconv.Atoi(strings.TrimSuffix(expires, "h"))
+			if err == nil {
+				exp = time.Hour * time.Duration(hours)
+			}
+		}
+	}
 	return &model.Link{
 		URL: u,
 		Header: http.Header{
 			"User-Agent": []string{"pan.baidu.com"},
 		},
+		Expiration: &exp,
 	}, nil
 }
 

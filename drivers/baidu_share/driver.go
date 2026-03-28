@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/OpenListTeam/OpenList/v4/drivers/baidu_netdisk"
+	"github.com/OpenListTeam/OpenList/v4/drivers/base"
 	"github.com/OpenListTeam/OpenList/v4/internal/driver"
 	"github.com/OpenListTeam/OpenList/v4/internal/errs"
 	"github.com/OpenListTeam/OpenList/v4/internal/model"
@@ -49,11 +50,11 @@ func (d *BaiduShare) InitReference(storage driver.Driver) error {
 func (d *BaiduShare) Init(ctx context.Context) error {
 	// TODO login / refresh token
 	//op.MustSaveDriverStorage(d)
-	d.client = resty.New().
+	d.client = base.NewRestyClient().
 		SetBaseURL("https://pan.baidu.com").
 		SetHeader("User-Agent", "netdisk").
 		SetHeader("Referer", "https://pan.baidu.com").
-		SetCookie(&http.Cookie{Name: "BDUSS", Value: d.BDUSS}).
+		SetCookie(&http.Cookie{Name: "BDUSS", Value: d.ref.Addition.BDUSS}).
 		SetCookie(&http.Cookie{Name: "ndut_fmt"})
 	respJson := struct {
 		Errno int64 `json:"errno"`
@@ -161,6 +162,12 @@ func (d *BaiduShare) Link(ctx context.Context, file model.Obj, args model.LinkAr
 	if d.ref == nil {
 		return nil, fmt.Errorf("no reference")
 	}
+	if args.Redirect {
+		if err := d.ref.EnsureUA(args); err != nil {
+			return nil, err
+		}
+	}
+
 	// 1. 转存
 	transferJson := struct {
 		Errno int64 `json:"errno"`
@@ -196,7 +203,7 @@ func (d *BaiduShare) Link(ctx context.Context, file model.Obj, args model.LinkAr
 		}).
 		SetFormData(map[string]string{
 			"fsidlist": fmt.Sprintf("[%s]", file.GetID()),
-			"path":     d.Addition.TransferPath,
+			"path":     d.ref.Addition.TransferPath,
 		}).
 		SetResult(&transferJson).
 		Post("share/transfer")
@@ -217,7 +224,7 @@ func (d *BaiduShare) Link(ctx context.Context, file model.Obj, args model.LinkAr
 	}
 	obj.ID = fmt.Sprint(transferJson.Extra.List[0].ToFsID)
 	obj.Path = transferJson.Extra.List[0].To
-
+	defer d.ref.Remove(ctx, obj) // 转存后删除，避免占用空间
 	return d.ref.Link(ctx, obj, args)
 }
 
