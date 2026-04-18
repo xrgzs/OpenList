@@ -14,6 +14,7 @@ import (
 	"github.com/OpenListTeam/OpenList/v4/internal/conf"
 	"github.com/OpenListTeam/OpenList/v4/pkg/utils"
 	"github.com/rclone/rclone/lib/readers"
+	"golang.org/x/net/http2"
 
 	"github.com/OpenListTeam/OpenList/v4/pkg/http_range"
 	"github.com/go-resty/resty/v2"
@@ -348,16 +349,34 @@ func SetRestyProxyIfConfigured(client *resty.Client) {
 
 // NewUTLSTransport creates a new http.Transport that uses utls for TLS connections
 func NewUTLSTransport() *http.Transport {
-	return &http.Transport{
+	transport := &http.Transport{
 		Proxy: http.ProxyFromEnvironment,
 		// TLSClientConfig: &tls.Config{InsecureSkipVerify: conf.Conf.TlsInsecureSkipVerify},
 		DialTLSContext: DialTLSContextWithUTLS,
+		// 显式开启 H2 尝试
+		ForceAttemptHTTP2: true,
+		// 其他超时优化参数建议保持默认或按需配置
+		// IdleConnTimeout:       90 * time.Second,
+		// TLSHandshakeTimeout:   10 * time.Second,
+		// ExpectContinueTimeout: 1 * time.Second,
 	}
+
+	// 关键点 1：必须手动配置 H2 传输
+	// 否则即使 DialTLS 握手成功，Transport 也无法解析 HTTP2 数据流
+	if err := http2.ConfigureTransport(transport); err != nil {
+		log.Errorf("Failed to configure http2 transport: %v", err)
+	}
+
+	return transport
 }
 
 // DialTLSContextWithUTLS dials a TLS connection using utls for TLS handshake
 func DialTLSContextWithUTLS(ctx context.Context, network, addr string) (net.Conn, error) {
-	dialer := &net.Dialer{}
+	dialer := &net.Dialer{
+		Timeout:   30 * time.Second,
+		KeepAlive: 30 * time.Second,
+	}
+
 	conn, err := dialer.DialContext(ctx, network, addr)
 	if err != nil {
 		return nil, err
@@ -365,16 +384,22 @@ func DialTLSContextWithUTLS(ctx context.Context, network, addr string) (net.Conn
 
 	host, _, err := net.SplitHostPort(addr)
 	if err != nil {
-		conn.Close()
-		return nil, err
+		host = addr
 	}
 
-	uconn := utls.UClient(conn, &utls.Config{
+	// 关键点 2：在 Config 中加入 NextProtos
+	config := &utls.Config{
 		ServerName:         host,
 		InsecureSkipVerify: conf.Conf.TlsInsecureSkipVerify,
-	}, utls.HelloChrome_Auto)
+		// 必须显式声明支持的协议，否则无法绕过基于 H2 特征的检测
+		NextProtos: []string{"h2", "http/1.1"},
+	}
 
-	err = uconn.Handshake()
+	// 使用 Chrome_Auto 或指定具体版本
+	uconn := utls.UClient(conn, config, utls.HelloChrome_Auto)
+
+	// 建议使用带 Context 的握手
+	err = uconn.HandshakeContext(ctx)
 	if err != nil {
 		conn.Close()
 		return nil, err
