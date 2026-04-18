@@ -1,11 +1,9 @@
 package base
 
 import (
-	"crypto/tls"
 	"net/http"
 	"time"
 
-	"github.com/OpenListTeam/OpenList/v4/internal/conf"
 	"github.com/OpenListTeam/OpenList/v4/internal/net"
 	"github.com/go-resty/resty/v2"
 )
@@ -26,7 +24,7 @@ func InitClient() {
 		resty.RedirectPolicyFunc(func(req *http.Request, via []*http.Request) error {
 			return http.ErrUseLastResponse
 		}),
-	).SetTLSClientConfig(&tls.Config{InsecureSkipVerify: conf.Conf.TlsInsecureSkipVerify})
+	).SetTransport(net.NewUTLSTransport())
 	NoRedirectClient.SetHeader("user-agent", UserAgent)
 	net.SetRestyProxyIfConfigured(NoRedirectClient)
 
@@ -40,7 +38,7 @@ func NewRestyClient() *resty.Client {
 		SetRetryCount(3).
 		SetRetryResetReaders(true).
 		SetTimeout(DefaultTimeout).
-		SetTLSClientConfig(&tls.Config{InsecureSkipVerify: conf.Conf.TlsInsecureSkipVerify})
+		SetTransport(net.NewUTLSTransport())
 
 	net.SetRestyProxyIfConfigured(client)
 	return client

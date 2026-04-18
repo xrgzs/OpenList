@@ -1,8 +1,6 @@
 module github.com/OpenListTeam/OpenList/v4
 
-go 1.24.0
-
-toolchain go1.24.13
+go 1.25.0
 
 require (
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.18.1
@@ -65,6 +63,7 @@ require (
 	github.com/pquerna/otp v1.5.0
 	github.com/quic-go/quic-go v0.54.1
 	github.com/rclone/rclone v1.70.3
+	github.com/refraction-networking/utls v1.8.2
 	github.com/shirou/gopsutil/v4 v4.25.5
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/afero v1.14.0
@@ -76,9 +75,9 @@ require (
 	github.com/upyun/go-sdk/v3 v3.0.4
 	github.com/winfsp/cgofuse v1.6.0
 	github.com/zzzhr1990/go-common-entity v0.0.0-20250202070650-1a200048f0d3
-	golang.org/x/crypto v0.46.0
+	golang.org/x/crypto v0.50.0
 	golang.org/x/image v0.29.0
-	golang.org/x/net v0.48.0
+	golang.org/x/net v0.52.0
 	golang.org/x/oauth2 v0.34.0
 	golang.org/x/time v0.14.0
 	google.golang.org/appengine v1.6.8
@@ -130,7 +129,7 @@ require (
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
 	go.uber.org/mock v0.5.0 // indirect
 	golang.org/x/exp v0.0.0-20250606033433-dcc06ee1d476 // indirect
-	golang.org/x/mod v0.30.0 // indirect
+	golang.org/x/mod v0.34.0 // indirect
 	gopkg.in/go-jose/go-jose.v2 v2.6.3 // indirect
 	modernc.org/libc v1.22.5 // indirect
 	modernc.org/mathutil v1.5.0 // indirect
@@ -179,7 +178,7 @@ require (
 	github.com/abbot/go-http-auth v0.4.0 // indirect
 	github.com/aead/ecdh v0.2.0 // indirect
 	github.com/andreburgaud/crypt2go v1.8.0 // indirect
-	github.com/andybalholm/brotli v1.1.2-0.20250424173009-453214e765f3 // indirect
+	github.com/andybalholm/brotli v1.2.1 // indirect
 	github.com/axgle/mahonia v0.0.0-20180208002826-3358181d7394
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
 	github.com/benbjohnson/clock v1.3.0 // indirect
@@ -237,7 +236,7 @@ require (
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/jzelinskie/whirlpool v0.0.0-20201016144138-0675e54bb004 // indirect
-	github.com/klauspost/compress v1.18.0 // indirect
+	github.com/klauspost/compress v1.18.5 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.10 // indirect
 	github.com/kr/fs v0.1.0 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
@@ -295,11 +294,11 @@ require (
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	go.etcd.io/bbolt v1.4.0 // indirect
 	golang.org/x/arch v0.18.0 // indirect
-	golang.org/x/sync v0.19.0
-	golang.org/x/sys v0.40.0
-	golang.org/x/term v0.38.0 // indirect
-	golang.org/x/text v0.32.0
-	golang.org/x/tools v0.39.0 // indirect
+	golang.org/x/sync v0.20.0
+	golang.org/x/sys v0.43.0
+	golang.org/x/term v0.42.0 // indirect
+	golang.org/x/text v0.36.0
+	golang.org/x/tools v0.43.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20251222181119-0a764e51fe1b // indirect
 	google.golang.org/grpc v1.78.0
 	google.golang.org/protobuf v1.36.11 // indirect
