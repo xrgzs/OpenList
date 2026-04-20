@@ -15,6 +15,8 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+// copy from https://github.com/AlistGo/alist/pull/9476
+
 const (
 	accountBaseURL = "https://account.guangyapan.com"
 	apiBaseURL     = "https://api.guangyapan.com"
