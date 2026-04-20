@@ -411,4 +411,21 @@ func (d *GuangYaPan) Put(ctx context.Context, dstDir model.Obj, file model.FileS
 	return d.waitUploadTaskInfo(ctx, taskID)
 }
 
+func (d *GuangYaPan) GetDetails(ctx context.Context) (*model.StorageDetails, error) {
+	var resp assetsInfoResp
+
+	if err := d.postAPI(ctx, "/nd.bizassets.s/v1/get_assets", nil, &resp); err != nil {
+		return nil, err
+	}
+	if resp.Data.TotalSpaceSize <= 0 {
+		return nil, errors.New("invalid total space size")
+	}
+	return &model.StorageDetails{
+		DiskUsage: model.DiskUsage{
+			TotalSpace: resp.Data.TotalSpaceSize,
+			UsedSpace:  resp.Data.UsedSpaceSize,
+		},
+	}, nil
+}
+
 var _ driver.Driver = (*GuangYaPan)(nil)

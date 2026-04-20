@@ -133,6 +133,19 @@ type taskInfoResp struct {
 	} `json:"data"`
 }
 
+type assetsInfoResp struct {
+	Msg  string `json:"msg"`
+	Data struct {
+		TotalSpaceSize int64 `json:"totalSpaceSize"`
+		UsedSpaceSize  int64 `json:"usedSpaceSize"`
+		// VipStatus      int   `json:"vipStatus"`
+		// VipLeftTime    int   `json:"vipLeftTime"`
+		// SvipStatus     int   `json:"svipStatus"`
+		// VipExpireTime  int   `json:"vipExpireTime"`
+		// SystemTime     int   `json:"systemTime"`
+	} `json:"data"`
+}
+
 func unixOrZero(v int64) time.Time {
 	if v <= 0 {
 		return time.Time{}
