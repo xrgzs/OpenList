@@ -8,6 +8,7 @@ import (
 
 	"github.com/OpenListTeam/OpenList/v4/drivers/base"
 	"github.com/OpenListTeam/OpenList/v4/pkg/cookie"
+	"github.com/OpenListTeam/OpenList/v4/pkg/utils"
 	"github.com/google/uuid"
 )
 
@@ -86,16 +87,18 @@ func (d *SeewoPinco) signLottery() error {
 		return err
 	}
 	if res.IsError() {
-		return fmt.Errorf("sign lottery error: %s", res.Status())
+		return fmt.Errorf("%s", res.Status())
 	}
 	if recordResp.ErrorCode != 0 {
-		return fmt.Errorf("sign lottery error: %d %s", recordResp.ErrorCode, recordResp.Message)
+		return fmt.Errorf("%d: %s", recordResp.ErrorCode, recordResp.Message)
 	}
 
 	// Check if already signed today
 	if recordResp.Data.SignRecord.BeenSigned {
-		fmt.Printf("希沃白板今日已签到, 当前连续签到第%d天\n",
+		msg := fmt.Sprintf("希沃白板今日已签到, 当前连续签到第%d天",
 			recordResp.Data.SignRecord.CurrentDay)
+		utils.Log.Infof("[Seewo-%s] %s", d.GetStorage().MountPath, msg)
+		fmt.Printf("[Seewo-%s] %s\n", d.GetStorage().MountPath, msg)
 		return nil
 	}
 
@@ -112,15 +115,17 @@ func (d *SeewoPinco) signLottery() error {
 		return err
 	}
 	if signRes.IsError() {
-		return fmt.Errorf("sign lottery error: %s", signRes.Status())
+		return fmt.Errorf("%s", signRes.Status())
 	}
 	if signResp.ErrorCode != 0 {
-		return fmt.Errorf("sign lottery error: %d %s", signResp.ErrorCode, signResp.Message)
+		return fmt.Errorf("%d: %s", signResp.ErrorCode, signResp.Message)
 	}
 
-	fmt.Printf("已为您在希沃白板签到, 当前连续签到第%d天, 获得%s和%s\n",
+	msg := fmt.Sprintf("已为您在希沃白板签到, 当前连续签到第%d天, 获得%s和%s",
 		signResp.Data.SignRecord.CurrentDay,
 		signResp.Data.SignRecord.PrizeName,
 		signResp.Data.LotteryRecord.PrizeName)
+	utils.Log.Infof("[Seewo-%s] %s", d.GetStorage().MountPath, msg)
+	fmt.Printf("[Seewo-%s] %s\n", d.GetStorage().MountPath, msg)
 	return nil
 }

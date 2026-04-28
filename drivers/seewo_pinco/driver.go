@@ -2,6 +2,7 @@ package seewo_pinco
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/OpenListTeam/OpenList/v4/drivers/base"
@@ -42,14 +43,15 @@ func (d *SeewoPinco) Init(ctx context.Context) error {
 	d.cron.Do(func() {
 		err := d.signLottery()
 		if err != nil {
-			utils.Log.Errorf("%+v", err)
+			utils.Log.Errorf("[Seewo-%s] 签到错误: %+v", d.GetStorage().MountPath, err)
+			fmt.Printf("[Seewo-%s] 签到错误: %+v\n", d.GetStorage().MountPath, err)
 		}
 	})
 	// 立即签到一次
 	err := d.signLottery()
 	if err != nil {
-		utils.Log.Errorf("%+v", err)
-
+		utils.Log.Errorf("[Seewo-%s] 签到错误: %+v", d.GetStorage().MountPath, err)
+		fmt.Printf("[Seewo-%s] 签到错误: %+v\n", d.GetStorage().MountPath, err)
 	}
 	return nil
 }
