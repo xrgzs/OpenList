@@ -162,11 +162,6 @@ func (d *BaiduShare) Link(ctx context.Context, file model.Obj, args model.LinkAr
 	if d.ref == nil {
 		return nil, fmt.Errorf("no reference")
 	}
-	if args.Redirect {
-		if err := d.ref.EnsureUA(args); err != nil {
-			return nil, err
-		}
-	}
 
 	// 1. 转存
 	transferJson := struct {
