@@ -6,17 +6,17 @@ import (
 )
 
 type Addition struct {
-	// Usually one of two
-	driver.RootPath
 	driver.RootID
 	// define other
-	Field string `json:"field" type:"select" required:"true" options:"a,b,c" default:"a"`
+	Token    string `json:"token" required:"true"`
+	Cookie   string `json:"cookie" required:"true"`
+	CustomUA string `json:"custom_ua"`
 }
 
 var config = driver.Config{
 	Name:        "Geegeng",
 	LocalSort:   true,
-	DefaultRoot: "root, / or other",
+	DefaultRoot: "-1",
 	Alert:       "",
 }
 
