@@ -93,6 +93,7 @@ func (d *Geegeng) Link(ctx context.Context, file model.Obj, args model.LinkArgs)
 			"id": file.GetID(),
 		}).
 		SetResult(&resp).
+		SetHeader("X-Forwarded-For", args.IP).
 		Post("/files/downFile")
 	if err != nil {
 		return nil, err
