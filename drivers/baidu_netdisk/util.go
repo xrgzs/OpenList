@@ -196,19 +196,7 @@ func (d *BaiduNetdisk) getFiles(dir string) ([]File, error) {
 	return res, nil
 }
 
-func (d *BaiduNetdisk) EnsureUA(args model.LinkArgs) error {
-	if strings.Contains(args.Header.Get("User-Agent"), "Mozilla") {
-		return fmt.Errorf("redirect not supported for User-Agent containing Mozilla, please change User-Agent")
-	}
-	return nil
-}
-
-func (d *BaiduNetdisk) linkOfficial(file model.Obj, args model.LinkArgs) (*model.Link, error) {
-	if args.Redirect {
-		if err := d.EnsureUA(args); err != nil {
-			return nil, err
-		}
-	}
+func (d *BaiduNetdisk) linkOfficial(file model.Obj, _ model.LinkArgs) (*model.Link, error) {
 	var resp DownloadResp
 	params := map[string]string{
 		"method": "filemetas",
@@ -220,6 +208,9 @@ func (d *BaiduNetdisk) linkOfficial(file model.Obj, args model.LinkArgs) (*model
 		return nil, err
 	}
 	u := fmt.Sprintf("%s&access_token=%s", resp.List[0].Dlink, d.AccessToken)
+	if d.UseInsecureRedirect {
+		return &model.Link{URL: u}, nil
+	}
 	req := base.NoRedirectClient.R()
 	req.SetHeader("User-Agent", "pan.baidu.com")
 	req.SetDoNotParseResponse(true)
