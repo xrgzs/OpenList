@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -207,19 +208,41 @@ func (d *BaiduNetdisk) linkOfficial(file model.Obj, _ model.LinkArgs) (*model.Li
 		return nil, err
 	}
 	u := fmt.Sprintf("%s&access_token=%s", resp.List[0].Dlink, d.AccessToken)
-	res, err := base.NoRedirectClient.R().SetHeader("User-Agent", "pan.baidu.com").Head(u)
+	if d.UseInsecureRedirect {
+		return &model.Link{URL: u}, nil
+	}
+	req := base.NoRedirectClient.R()
+	req.SetHeader("User-Agent", "pan.baidu.com")
+	req.SetDoNotParseResponse(true)
+	res, err := req.Get(u)
 	if err != nil {
 		return nil, err
 	}
-	// if res.StatusCode() == 302 {
-	u = res.Header().Get("location")
-	//}
-
+	_ = res.RawResponse.Body.Close()
+	if (res.StatusCode() == 302 || res.StatusCode() == 307 || res.StatusCode() == 308) && res.Header().Get("location") != "" {
+		u = res.Header().Get("location")
+	} else {
+		return nil, fmt.Errorf("redirect failed, status: %d", res.StatusCode())
+	}
+	// 上面接口返回8小时
+	var exp = time.Hour * 8
+	_dl, err := url.Parse(resp.List[0].Dlink)
+	if err == nil {
+		q := _dl.Query()
+		expires := q.Get("expires") // like "8h"
+		if strings.HasSuffix(expires, "h") {
+			hours, err := strconv.Atoi(strings.TrimSuffix(expires, "h"))
+			if err == nil {
+				exp = time.Hour * time.Duration(hours)
+			}
+		}
+	}
 	return &model.Link{
 		URL: u,
 		Header: http.Header{
 			"User-Agent": []string{"pan.baidu.com"},
 		},
+		Expiration: &exp,
 	}, nil
 }
 

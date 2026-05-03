@@ -14,17 +14,19 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  DOCKERHUB_ORG_NAME: ${{ vars.DOCKERHUB_ORG_NAME || 'openlistteam' }}
-  GHCR_ORG_NAME: ${{ vars.GHCR_ORG_NAME || 'openlistteam' }}
-  IMAGE_NAME: openlist-git
-  IMAGE_NAME_DOCKERHUB: openlist
+  # DOCKERHUB_ORG_NAME: ${{ vars.DOCKERHUB_ORG_NAME || 'openlistteam' }}
+  # GHCR_ORG_NAME: ${{ vars.GHCR_ORG_NAME || 'openlistteam' }}
+  # IMAGE_NAME: openlist-git
+  # IMAGE_NAME_DOCKERHUB: openlist
   REGISTRY: ghcr.io
   ARTIFACT_NAME: 'binaries_docker_release'
-  RELEASE_PLATFORMS: 'linux/amd64,linux/arm64,linux/arm/v7,linux/386,linux/arm/v6,linux/ppc64le,linux/riscv64,linux/loong64' ### Temporarily disable Docker builds for linux/s390x architectures for unknown reasons.
+  RELEASE_PLATFORMS: 'linux/amd64,linux/arm64'
   IMAGE_PUSH: ${{ github.event_name == 'push' }}
   IMAGE_TAGS_BETA: |
     type=ref,event=pr
     type=raw,value=beta,enable={{is_default_branch}}
+    type=raw,value=main,enable={{is_default_branch}}
+    type=raw,value=latest,enable={{is_default_branch}}
 
 jobs:
   build_binary:
@@ -117,20 +119,19 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Login to DockerHub Container Registry
-        if: env.IMAGE_PUSH == 'true'
-        uses: docker/login-action@v3
-        with:
-          username: ${{ vars.DOCKERHUB_ORG_NAME_BACKUP || env.DOCKERHUB_ORG_NAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      # - name: Login to DockerHub Container Registry
+      #   if: env.IMAGE_PUSH == 'true'
+      #   uses: docker/login-action@v3
+      #   with:
+      #     username: ${{ vars.DOCKERHUB_ORG_NAME_BACKUP || env.DOCKERHUB_ORG_NAME }}
+      #     password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Docker meta
         id: meta
         uses: docker/metadata-action@v5
         with:
           images: |
-            ${{ env.REGISTRY }}/${{ env.GHCR_ORG_NAME }}/${{ env.IMAGE_NAME }}
-            ${{ env.DOCKERHUB_ORG_NAME }}/${{ env.IMAGE_NAME_DOCKERHUB }}
+            ${{ env.REGISTRY }}/xrgzs/openlist
           tags: ${{ env.IMAGE_TAGS_BETA }}
           flavor: |
             ${{ matrix.tag_favor }}
@@ -147,4 +148,33 @@ jobs:
             ${{ matrix.build_arg }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          platforms: ${{ env.RELEASE_PLATFORMS }}
+
+      - name: Replace paths for alist
+        run: |
+          sed -i 's|/opt/openlist|/opt/alist|g' Dockerfile.ci
+          sed -i 's|/opt/openlist|/opt/alist|g' entrypoint.sh
+
+      - name: Docker meta (alist)
+        id: meta_alist
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ${{ env.REGISTRY }}/xrgzs/alist
+          tags: ${{ env.IMAGE_TAGS_BETA }}
+          flavor: |
+            ${{ matrix.tag_favor }}
+
+      - name: Build and push (alist)
+        id: docker_build_alist
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.ci
+          push: ${{ env.IMAGE_PUSH == 'true' }}
+          build-args: |
+            BASE_IMAGE_TAG=${{ matrix.base_image_tag }}
+            ${{ matrix.build_arg }}
+          tags: ${{ steps.meta_alist.outputs.tags }}
+          labels: ${{ steps.meta_alist.outputs.labels }}
           platforms: ${{ env.RELEASE_PLATFORMS }}

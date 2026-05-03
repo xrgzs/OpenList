@@ -2,7 +2,6 @@ package chaoxing
 
 import (
 	"bytes"
-	"fmt"
 	"strconv"
 	"time"
 
@@ -139,7 +138,8 @@ type File struct {
 		Topsort          int     `json:"topsort"`
 		Restype          string  `json:"restype"`
 		Size             int_str `json:"size"`
-		UploadDate       int64   `json:"uploadDate"`
+		UploadDate       any     `json:"uploadDate"`
+		ModifyDate       int64   `json:"modifyDate"`
 		FileSize         string  `json:"fileSize"`
 		Name             string  `json:"name"`
 		FileID           string  `json:"fileId"`
@@ -167,12 +167,11 @@ type ListFileResp struct {
 }
 
 type DownResp struct {
-	Msg        string `json:"msg"`
-	Duration   int    `json:"duration"`
-	Download   string `json:"download"`
-	FileStatus string `json:"fileStatus"`
-	URL        string `json:"url"`
-	Status     bool   `json:"status"`
+	Msg    string `json:"msg"`
+	Result int    `json:"result"`
+	Data   struct {
+		Download string `json:"download"`
+	} `json:"data"`
 }
 
 type UploadDataRsp struct {
@@ -265,9 +264,9 @@ func fileToObj(f File) *model.Object {
 			IsFolder: true,
 		}
 	}
-	paserTime := time.UnixMilli(f.Content.UploadDate)
+	paserTime := time.UnixMilli(f.Content.ModifyDate)
 	return &model.Object{
-		ID:       fmt.Sprintf("%d$%s", f.ID, f.Content.FileID),
+		ID:       f.Content.ObjectID,
 		Name:     f.Content.Name,
 		Size:     int64(f.Content.Size),
 		Modified: paserTime,
