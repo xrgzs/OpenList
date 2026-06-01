@@ -142,16 +142,20 @@ func (d *OpenList) Link(ctx context.Context, file model.Obj, args model.LinkArgs
 	if d.Cdn != "" {
 		resp.Data.RawURL = strings.Replace(resp.Data.RawURL, d.Address, d.Cdn, 1)
 	}
+
 	var exp time.Duration
-	now := time.Now()
-	// 设置直链缓存时间为列表缓存时间
-	// exp = time.Minute * time.Duration(d.GetStorage().CacheExpiration)
+	var cacheInfo *model.LinkCacheInfo
 
 	if resp.Data.Time != nil && resp.Data.Expiration != nil {
-		// 直接从接口返回的时间中获取剩余缓存时间
-		exp = *resp.Data.Expiration
+		// 上游直接返回了缓存信息，直接透传，不做猜测
+		cacheInfo = &model.LinkCacheInfo{
+			Time:       *resp.Data.Time,
+			Expiration: *resp.Data.Expiration,
+		}
+		exp = max(*resp.Data.Expiration-time.Since(*resp.Data.Time), 0)
 	} else if u, err := url.Parse(resp.Data.RawURL); err == nil {
-		// 从直链参数中计算出缓存时间
+		// 上游没有返回缓存信息（老版本），从直链参数中计算
+		now := time.Now()
 		if resp.Data.Time != nil {
 			now = *resp.Data.Time
 		}
@@ -200,11 +204,12 @@ func (d *OpenList) Link(ctx context.Context, file model.Obj, args model.LinkArgs
 		return &model.Link{
 			URL:        resp.Data.RawURL,
 			Expiration: &exp,
-			Time:       &now,
+			CacheInfo:  cacheInfo,
 		}, nil
 	}
 	return &model.Link{
-		URL: resp.Data.RawURL,
+		URL:       resp.Data.RawURL,
+		CacheInfo: cacheInfo,
 	}, nil
 }
 
