@@ -42,6 +42,32 @@ type Link struct {
 	RequireReference bool `json:"-"`
 
 	Time *time.Time // link 生成时间，留空则为获取时自动生成
+
+	// CacheInfo 用于保存后端驱动的缓存元数据，便于在 Expiration 被中间驱动清除后仍可获取缓存信息
+	CacheInfo *LinkCacheInfo `json:"-"`
+}
+
+// LinkCacheInfo 保存链路缓存的元数据
+type LinkCacheInfo struct {
+	// 缓存生成时间
+	Time time.Time
+	// 缓存过期时长
+	Expiration time.Duration
+}
+
+type linkCacheInfoKeyType struct{}
+
+var linkCacheInfoKey = linkCacheInfoKeyType{}
+
+// WithLinkCacheInfo 将 LinkCacheInfo 存入 context
+func WithLinkCacheInfo(ctx context.Context, info *LinkCacheInfo) context.Context {
+	return context.WithValue(ctx, linkCacheInfoKey, info)
+}
+
+// GetLinkCacheInfo 从 context 中获取 LinkCacheInfo
+func GetLinkCacheInfo(ctx context.Context) *LinkCacheInfo {
+	v, _ := ctx.Value(linkCacheInfoKey).(*LinkCacheInfo)
+	return v
 }
 
 type OtherArgs struct {

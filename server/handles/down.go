@@ -12,6 +12,7 @@ import (
 	"github.com/OpenListTeam/OpenList/v4/internal/fs"
 	"github.com/OpenListTeam/OpenList/v4/internal/model"
 	"github.com/OpenListTeam/OpenList/v4/internal/net"
+	"github.com/OpenListTeam/OpenList/v4/internal/op"
 	"github.com/OpenListTeam/OpenList/v4/internal/setting"
 	"github.com/OpenListTeam/OpenList/v4/pkg/utils"
 	"github.com/OpenListTeam/OpenList/v4/server/common"
@@ -91,16 +92,14 @@ func redirect(c *gin.Context, link *model.Link) {
 			return
 		}
 	}
-	if link.Expiration != nil {
+	if cacheInfo := op.GetLinkCacheInfoFromLink(link); cacheInfo != nil {
 		c.Header("X-Op-Cache-Lookup", "HIT")
 		// 缓存过期时长
-		c.Header("X-Op-Cache-Expire", fmt.Sprintf("%d", int(link.Expiration.Seconds())))
-		if link.Time != nil {
-			// 缓存有效剩余TTL
-			expTime := link.Time.Add(*link.Expiration)
-			ttl := time.Until(expTime)
-			c.Header("X-Op-Cache-TTL", fmt.Sprintf("%d", int(ttl.Seconds())))
-		}
+		c.Header("X-Op-Cache-Expire", fmt.Sprintf("%d", int(cacheInfo.Expiration.Seconds())))
+		// 缓存有效剩余TTL
+		expTime := cacheInfo.Time.Add(cacheInfo.Expiration)
+		ttl := time.Until(expTime)
+		c.Header("X-Op-Cache-TTL", fmt.Sprintf("%d", int(ttl.Seconds())))
 	} else {
 		c.Header("X-Op-Cache-Lookup", "BYPASS")
 	}

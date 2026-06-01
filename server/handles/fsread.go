@@ -306,8 +306,7 @@ func FsGet(c *gin.Context, req *FsGetReq, user *model.User) {
 		return
 	}
 	var rawURL string
-	var linkTime *time.Time
-	var exp *time.Duration
+	var cacheInfo *model.LinkCacheInfo
 
 	storage, err := fs.GetStorage(reqPath, &fs.GetStoragesArgs{})
 	provider, ok := model.GetProvider(obj)
@@ -348,8 +347,7 @@ func FsGet(c *gin.Context, req *FsGetReq, user *model.User) {
 				}
 				defer link.Close()
 				rawURL = link.URL
-				linkTime = link.Time
-				exp = link.Expiration
+				cacheInfo = op.GetLinkCacheInfoFromLink(link)
 			}
 		}
 	}
@@ -362,6 +360,12 @@ func FsGet(c *gin.Context, req *FsGetReq, user *model.User) {
 	parentMeta, _ := op.GetNearestMeta(parentPath)
 	thumb, _ := model.GetThumb(obj)
 	mountDetails, _ := model.GetStorageDetails(obj)
+	var linkTime *time.Time
+	var linkExp *time.Duration
+	if cacheInfo != nil {
+		linkTime = &cacheInfo.Time
+		linkExp = &cacheInfo.Expiration
+	}
 	common.SuccessResp(c, FsGetResp{
 		ObjResp: ObjResp{
 			Name:         obj.GetName(),
@@ -378,7 +382,7 @@ func FsGet(c *gin.Context, req *FsGetReq, user *model.User) {
 		},
 		RawURL:     rawURL,
 		Time:       linkTime,
-		Expiration: exp,
+		Expiration: linkExp,
 		Readme:     getReadme(meta, reqPath),
 		Header:     getHeader(meta, reqPath),
 		Provider:   provider,
