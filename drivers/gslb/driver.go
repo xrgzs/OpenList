@@ -3,6 +3,7 @@ package gslb
 import (
 	"context"
 	"fmt"
+	"math/rand/v2"
 	"path"
 	"slices"
 	"strings"
@@ -42,6 +43,16 @@ func (d *Gslb) Init(ctx context.Context) error {
 	err := yaml.Unmarshal([]byte(d.Addition.Paths), &d.storages)
 	if err != nil {
 		return err
+	}
+	// 校验配置合法性，并处理字段隐含关系
+	for i := range d.storages {
+		if err := d.storages[i].Validate(); err != nil {
+			return err
+		}
+		// balance_universal 隐含 balance: true
+		if d.storages[i].BalanceUniversal {
+			d.storages[i].Balance = true
+		}
 	}
 	if !db.GetIPDB().HasData() {
 		// return fmt.Errorf("ipdb is not initialized")
@@ -123,8 +134,12 @@ func (d *Gslb) Link(ctx context.Context, file model.Obj, args model.LinkArgs) (*
 		utils.Log.Infof("[gslb] request ip info: %s", data)
 	}
 
-	// 拷贝存储节点列表，过滤不可下载的节点
-	sorted := make([]GslbStorage, 0, len(d.storages))
+	// 拷贝存储节点列表，过滤不可下载的节点，并计分
+	type scoredStorage struct {
+		storage GslbStorage
+		score   int
+	}
+	scored := make([]scoredStorage, 0, len(d.storages))
 	for _, s := range d.storages {
 		if s.NoDown {
 			continue
@@ -135,26 +150,53 @@ func (d *Gslb) Link(ctx context.Context, file model.Obj, args model.LinkArgs) (*
 		if s.MaxSize.Int64() > 0 && file.GetSize() > s.MaxSize.Int64() {
 			continue
 		}
-
-		sorted = append(sorted, s)
+		carrierScore := calcCarrierScore(s, ipinfo)
+		countryScore := calcCountryScore(s, ipinfo.CountryCode)
+		scored = append(scored, scoredStorage{
+			storage: s,
+			score:   carrierScore + countryScore,
+		})
 	}
 
-	// 按优先级排序存储节点
-	slices.SortStableFunc(sorted, func(a, b GslbStorage) int {
-		// asn
-		aAsn := slices.Contains(a.Asn, ipinfo.Asn)
-		bAsn := slices.Contains(b.Asn, ipinfo.Asn)
+	// Boost 阶段：对 balance_universal 节点条件性提升分数
+	maxNonUniversalScore := 0
+	for _, ss := range scored {
+		if !ss.storage.BalanceUniversal && ss.score > maxNonUniversalScore {
+			maxNonUniversalScore = ss.score
+		}
+	}
+	for i := range scored {
+		ss := &scored[i]
+		if !ss.storage.BalanceUniversal {
+			continue
+		}
+		countryScore := calcCountryScore(ss.storage, ipinfo.CountryCode)
+		if countryScore > 0 && maxNonUniversalScore <= 2 && maxNonUniversalScore > ss.score {
+			ss.score = maxNonUniversalScore
+		}
+	}
+
+	// 排序阶段：按分数降序，同分时按原有优先级 tie-breaker
+	slices.SortStableFunc(scored, func(a, b scoredStorage) int {
+		if a.score != b.score {
+			if a.score > b.score {
+				return -1
+			}
+			return 1
+		}
+		// Tie-breaker: ASN > ASO > ISP > CountryCode
+		aAsn := slices.Contains(a.storage.Asn, ipinfo.Asn)
+		bAsn := slices.Contains(b.storage.Asn, ipinfo.Asn)
 		if aAsn != bAsn {
 			if aAsn {
 				return -1
 			}
 			return 1
 		}
-		// aso
-		aAso := slices.ContainsFunc(a.Aso, func(s string) bool {
+		aAso := slices.ContainsFunc(a.storage.Aso, func(s string) bool {
 			return strings.Contains(strings.ToLower(ipinfo.Aso), strings.ToLower(s))
 		})
-		bAso := slices.ContainsFunc(b.Aso, func(s string) bool {
+		bAso := slices.ContainsFunc(b.storage.Aso, func(s string) bool {
 			return strings.Contains(strings.ToLower(ipinfo.Aso), strings.ToLower(s))
 		})
 		if aAso != bAso {
@@ -163,11 +205,10 @@ func (d *Gslb) Link(ctx context.Context, file model.Obj, args model.LinkArgs) (*
 			}
 			return 1
 		}
-		// ISP
-		aIsp := slices.ContainsFunc(a.Isp, func(s string) bool {
+		aIsp := slices.ContainsFunc(a.storage.Isp, func(s string) bool {
 			return strings.HasPrefix(strings.ToLower(ipinfo.Isp), strings.ToLower(s))
 		})
-		bIsp := slices.ContainsFunc(b.Isp, func(s string) bool {
+		bIsp := slices.ContainsFunc(b.storage.Isp, func(s string) bool {
 			return strings.HasPrefix(strings.ToLower(ipinfo.Isp), strings.ToLower(s))
 		})
 		if aIsp != bIsp {
@@ -176,11 +217,10 @@ func (d *Gslb) Link(ctx context.Context, file model.Obj, args model.LinkArgs) (*
 			}
 			return 1
 		}
-		// CountryCode
-		aCountryCode := slices.Contains(a.CountryCode, ipinfo.CountryCode)
-		bCountryCode := slices.Contains(b.CountryCode, ipinfo.CountryCode)
-		if aCountryCode != bCountryCode {
-			if aCountryCode {
+		aCC := slices.Contains(a.storage.CountryCode, ipinfo.CountryCode)
+		bCC := slices.Contains(b.storage.CountryCode, ipinfo.CountryCode)
+		if aCC != bCC {
+			if aCC {
 				return -1
 			}
 			return 1
@@ -188,11 +228,40 @@ func (d *Gslb) Link(ctx context.Context, file model.Obj, args model.LinkArgs) (*
 		return 0
 	})
 
+	// 同分组内：balance 节点随机打乱，non-balance 保持原序
+	sorted := make([]GslbStorage, 0, len(scored))
+	i := 0
+	for i < len(scored) {
+		score := scored[i].score
+		j := i + 1
+		for j < len(scored) && scored[j].score == score {
+			j++
+		}
+		group := scored[i:j]
+		var balanceGroup []GslbStorage
+		var nonBalanceGroup []GslbStorage
+		for _, ss := range group {
+			if ss.storage.Balance {
+				balanceGroup = append(balanceGroup, ss.storage)
+			} else {
+				nonBalanceGroup = append(nonBalanceGroup, ss.storage)
+			}
+		}
+		if len(balanceGroup) >= 2 {
+			rand.Shuffle(len(balanceGroup), func(a, b int) {
+				balanceGroup[a], balanceGroup[b] = balanceGroup[b], balanceGroup[a]
+			})
+		}
+		sorted = append(sorted, balanceGroup...)
+		sorted = append(sorted, nonBalanceGroup...)
+		i = j
+	}
+
 	var logSorted []string
 	for _, s := range sorted {
 		logSorted = append(logSorted, s.Path)
 	}
-	fmt.Printf("[glsb] sorted: %v", logSorted)
+	utils.Log.Infof("[gslb] sorted: %v", logSorted)
 
 	// 按顺序依次尝试获取链接
 	for i, s := range sorted {
