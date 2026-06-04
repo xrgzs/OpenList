@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/OpenListTeam/OpenList/v4/drivers/base"
 	"github.com/OpenListTeam/OpenList/v4/internal/driver"
@@ -37,7 +38,6 @@ func (d *ZBrowser) Init(ctx context.Context) error {
 			"Connection":         "keep-alive",
 			"Accept":             "application/json, text/plain, */*",
 			"Accept-Encoding":    "gzip, deflate, br, zstd",
-			"Content-Type":       "application/x-www-form-urlencoded",
 			"sec-ch-ua-platform": "\"Windows\"",
 			"sec-ch-ua":          "\"Not A(Brand\";v=\"8\", \"Chromium\";v=\"132\", \"Google Chrome\";v=\"132\"",
 			"sec-ch-ua-mobile":   "?0",
@@ -46,7 +46,6 @@ func (d *ZBrowser) Init(ctx context.Context) error {
 			"sec-fetch-mode":     "cors",
 			"sec-fetch-dest":     "empty",
 			"accept-language":    "zh-CN,zh;q=0.9",
-			"cookie":             d.Cookie,
 			"priority":           "u=1, i",
 		})
 	return nil
@@ -83,7 +82,7 @@ func (d *ZBrowser) List(ctx context.Context, dir model.Obj, args model.ListArgs)
 		var fileResp fileListRespV1
 		_, err := d.apiRequest(ctx, "/v1/file/list", base.Json{
 			"pid":  dir.GetID(),
-			"ver":  2,
+			"ver":  0,
 			"oft":  next,
 			"num":  50,
 			"sort": 0,
@@ -99,7 +98,7 @@ func (d *ZBrowser) List(ctx context.Context, dir model.Obj, args model.ListArgs)
 		}
 		fileList = append(fileList, objs...)
 
-		if fileResp.Data.HasMore == 0 {
+		if fileResp.Data.HasMore == 0 || fileResp.Data.Next == next {
 			break
 		}
 		next = fileResp.Data.Next
@@ -109,10 +108,14 @@ func (d *ZBrowser) List(ctx context.Context, dir model.Obj, args model.ListArgs)
 }
 
 func (d *ZBrowser) Link(ctx context.Context, file model.Obj, args model.LinkArgs) (*model.Link, error) {
+	pid := "0"
+	if obj, ok := file.(*Obj); ok {
+		pid = obj.ParentID
+	}
 	var dl fileDlRespV3
 	_, err := d.apiRequest(ctx, "/v3/file/dl", base.Json{
-		"pid": "0",
-		"ver": 6,
+		"pid": pid,
+		"ver": 0,
 		"items": []base.Json{
 			{"type": 2, "id": file.GetID()},
 		},
@@ -120,8 +123,11 @@ func (d *ZBrowser) Link(ctx context.Context, file model.Obj, args model.LinkArgs
 	if err != nil {
 		return nil, err
 	}
+	if len(dl.Data.List.Files) == 0 {
+		return nil, fmt.Errorf("[ZBrowser] no download links returned")
+	}
 	referer := dl.Data.List.Files[0].URL
-	if idx := len(referer) - 1; idx >= 0 && referer[idx] != '/' {
+	if idx := strings.LastIndex(referer, "/"); idx >= 0 {
 		referer = referer[:idx+1]
 	}
 	return &model.Link{
@@ -133,7 +139,7 @@ func (d *ZBrowser) Link(ctx context.Context, file model.Obj, args model.LinkArgs
 			"Referer":         []string{referer},
 			"User-Agent":      []string{"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.6834.83 Safari/537.36 ZEROBROWSER"},
 			"Accept-Language": []string{"zh-CN,zh;q=0.9"},
-			"Cookie":          []string{d.Cookie},
+			"Cookie":          []string{"__guid=" + d.GUID + "; Q=" + d.Q + "; __NS_Q=" + d.Q + "; T=" + d.T + "; __NS_T=" + d.T},
 		},
 	}, nil
 }
@@ -142,7 +148,7 @@ func (d *ZBrowser) MakeDir(ctx context.Context, parentDir model.Obj, dirName str
 	var new dirNewRespV3
 	_, err := d.apiRequest(ctx, "/v3/dir/new", base.Json{
 		"pid":  parentDir.GetID(),
-		"ver":  7,
+		"ver":  0,
 		"name": dirName,
 	}, &new)
 	return err
@@ -156,7 +162,7 @@ func (d *ZBrowser) Move(ctx context.Context, srcObj, dstDir model.Obj) error {
 	var resp baseResp
 	_, err := d.apiRequest(ctx, "/v3/file/move", base.Json{
 		"pid":    src.ParentID,
-		"ver":    8,
+		"ver":    0,
 		"newPid": dstDir.GetID(),
 		"items": []base.Json{
 			{
@@ -174,18 +180,78 @@ func (d *ZBrowser) Move(ctx context.Context, srcObj, dstDir model.Obj) error {
 }
 
 func (d *ZBrowser) Rename(ctx context.Context, srcObj model.Obj, newName string) (model.Obj, error) {
-	// TODO rename obj, optional
-	return nil, errs.NotImplement
+	var resp baseResp
+	_, err := d.apiRequest(ctx, "/v3/file/rename", base.Json{
+		"id":       srcObj.GetID(),
+		"fromName": srcObj.GetName(),
+		"toName":   newName,
+	}, &resp)
+	if err != nil {
+		return nil, err
+	}
+	return &model.Object{
+		ID:       srcObj.GetID(),
+		Name:     newName,
+		Size:     srcObj.GetSize(),
+		Modified: srcObj.ModTime(),
+		IsFolder: srcObj.IsDir(),
+	}, nil
 }
 
 func (d *ZBrowser) Copy(ctx context.Context, srcObj, dstDir model.Obj) (model.Obj, error) {
-	// TODO copy obj, optional
-	return nil, errs.NotImplement
+	src, ok := srcObj.(*Obj)
+	if !ok {
+		return nil, fmt.Errorf("srcObj is not a zbrowser obj")
+	}
+	var resp baseResp
+	_, err := d.apiRequest(ctx, "/v3/dir/copy", base.Json{
+		"pid":    src.ParentID,
+		"ver":    0,
+		"newPid": dstDir.GetID(),
+		"items": []base.Json{
+			{
+				"type": func() int {
+					if srcObj.IsDir() {
+						return 1
+					}
+					return 2
+				}(),
+				"id": srcObj.GetID(),
+			},
+		},
+	}, &resp)
+	if err != nil {
+		return nil, err
+	}
+	return nil, nil
 }
 
 func (d *ZBrowser) Remove(ctx context.Context, obj model.Obj) error {
-	// TODO remove obj, optional
-	return errs.NotImplement
+	src, ok := obj.(*Obj)
+	if !ok {
+		return fmt.Errorf("obj is not a zbrowser obj")
+	}
+	path := "/v3/recycle/move"
+	if d.DeleteMode == "delete" {
+		path = "/v3/recycle/del"
+	}
+	var resp baseResp
+	_, err := d.apiRequest(ctx, path, base.Json{
+		"pid": src.ParentID,
+		"ver": 0,
+		"items": []base.Json{
+			{
+				"type": func() int {
+					if obj.IsDir() {
+						return 1
+					}
+					return 2
+				}(),
+				"id": obj.GetID(),
+			},
+		},
+	}, &resp)
+	return err
 }
 
 func (d *ZBrowser) Put(ctx context.Context, dstDir model.Obj, file model.FileStreamer, up driver.UpdateProgress) (model.Obj, error) {

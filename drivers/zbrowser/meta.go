@@ -7,7 +7,11 @@ import (
 
 type Addition struct {
 	driver.RootID
-	Cookie string `json:"cookie" required:"true"`
+	GUID       string `json:"guid" required:"true"`
+	MID        string `json:"mid" required:"true"`
+	Q          string `json:"q" required:"true"`
+	T          string `json:"t" required:"true"`
+	DeleteMode string `json:"delete_mode" type:"select" options:"recycle,delete" default:"recycle"`
 }
 
 var config = driver.Config{

@@ -138,12 +138,12 @@ type dirNewRespV3 struct {
 			DirName      string `json:"dirName"`
 			Pid          string `json:"pid"`
 			Status       int    `json:"status"`
-			CollectAt    int    `json:"collectAt"`
-			DelAt        int    `json:"delAt"`
+			CollectAt    int64  `json:"collectAt"`
+			DelAt        int64  `json:"delAt"`
 			CollectDirID int    `json:"collectDirId"`
 			Ver          int    `json:"ver"`
-			CreatedAt    int    `json:"createdAt"`
-			UpdatedAt    int    `json:"updatedAt"`
+			CreatedAt    int64  `json:"createdAt"`
+			UpdatedAt    int64  `json:"updatedAt"`
 		} `json:"model"`
 	} `json:"data"`
 }
