@@ -44,6 +44,12 @@ var onedriveHostMap = map[string]Host{
 
 func (d *Onedrive) GetMetaUrl(auth bool, path string) string {
 	host, _ := onedriveHostMap[d.Region]
+	if d.CustomGraphAPI != "" {
+		host.Api = strings.TrimRight(d.CustomGraphAPI, "/")
+	}
+	if d.CustomOauthAPI != "" {
+		host.Oauth = strings.TrimRight(d.CustomOauthAPI, "/")
+	}
 	path = utils.EncodePath(path, true)
 	if auth {
 		return host.Oauth
@@ -380,6 +386,9 @@ func (d *Onedrive) upBig(ctx context.Context, dstDir model.Obj, stream model.Fil
 func (d *Onedrive) getDrive(ctx context.Context) (*DriveResp, error) {
 	var api string
 	host, _ := onedriveHostMap[d.Region]
+	if d.CustomGraphAPI != "" {
+		host.Api = strings.TrimRight(d.CustomGraphAPI, "/")
+	}
 	if d.IsSharepoint {
 		api = fmt.Sprintf("%s/v1.0/sites/%s/drive", host.Api, d.SiteId)
 	} else {
