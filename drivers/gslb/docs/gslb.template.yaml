@@ -1,0 +1,92 @@
+# GSLB 配置模板
+# 详见：参考资料/GSLB负载均衡原理报告.md
+
+# ==================== 运营商匹配节点 ====================
+
+# 电信节点（负载均衡）
+- path: /电信节点A
+  asn: [4134]                    # ASN 精确匹配
+  aso: ["China Telecom", "CHINANET", "CHINATELECOM"]  # ASO 子串匹配（不区分大小写）
+  isp: ["电信", "中国电信"]       # ISP 前缀匹配（不区分大小写）
+  country_code: ["CN"]           # 国家代码精确匹配
+  balance: true                  # 同分节点间随机选择，实现负载均衡
+
+- path: /电信节点B
+  asn: [4134]
+  aso: ["China Telecom", "CHINANET", "CHINATELECOM"]
+  isp: ["电信", "中国电信"]
+  country_code: ["CN"]
+  balance: true                  # 与 /电信节点A 同分，随机分摊流量
+
+# 联通节点
+- path: /联通节点
+  asn: [4837]
+  aso: ["CHINA UNICOM", "China169"]
+  isp: ["联通", "中国联通"]
+  country_code: ["CN"]
+
+# 移动节点
+- path: /移动节点
+  asn: [9808]
+  aso: ["China Mobile", "Mobile Communication"]
+  isp: ["移动", "中国移动"]
+  country_code: ["CN"]
+
+# ==================== 地区匹配节点 ====================
+
+# 国内通用节点（无运营商匹配，仅国家匹配）
+- path: /国内通用
+  country_code: ["CN"]
+
+# 境外节点（排除中国用户）
+- path: /境外节点
+  country_code_not: ["CN"]       # 排除列表中的国家，与 country_code 互斥
+
+# ==================== 万能节点 ====================
+
+# 全球 CDN（无地区/运营商限制，条件性提升优先级）
+- path: /全球CDN
+  balance_universal: true        # 隐含 balance: true
+  # 当没有完美匹配（最高分 <= 2）时，自动提升至与最佳专用节点同分
+  # 当已有完美匹配（最高分 = 3）时，保持自然分，不抢占流量
+
+# ==================== 大文件专用节点 ====================
+
+- path: /电信高速
+  asn: [4134]
+  country_code: ["CN"]
+  min_size: 100MB                # 仅处理 >= 100MB 的文件
+  balance: true
+
+- path: /电信普通
+  asn: [4134]
+  country_code: ["CN"]
+  max_size: 100MB                # 仅处理 < 100MB 的文件
+  balance: true
+
+# ==================== 参考节点（仅用于 List） ====================
+
+- path: /参考节点
+  country_code: ["CN"]
+  ref: true                      # 仅作为 List 参考，不参与下载
+  no_down: true                  # 禁止下载
+
+# ==================== 链接替换 ====================
+
+- path: /替换示例
+  asn: [4134]
+  country_code: ["CN"]
+  replace:                       # URL 替换规则，仅替换首次出现
+    "old.domain.com": "new.domain.com"
+
+# ==================== 计分规则速查 ====================
+#
+# Carrier Score: ASN/ASO/ISP 任意命中 = 1，否则 = 0
+# Country Score: country_code 命中 或 country_code_not 未排除 = 2
+#               无任何 country 配置 = 1
+#               不匹配 = 0
+# 总分 = Carrier + Country（0 ~ 3）
+#
+# 同分 tie-breaker: ASN > ASO > ISP > CountryCode
+# balance: true 的同分节点随机选择（>= 2 个才随机）
+# balance_universal: true 条件性提升分数并参与负载均衡
