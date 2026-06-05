@@ -17,7 +17,8 @@ type ZBrowser struct {
 	model.Storage
 	Addition
 
-	client *resty.Client
+	client     *resty.Client
+	httpClient *http.Client
 }
 
 func (d *ZBrowser) Config() driver.Config {
@@ -48,6 +49,7 @@ func (d *ZBrowser) Init(ctx context.Context) error {
 			"accept-language":    "zh-CN,zh;q=0.9",
 			"priority":           "u=1, i",
 		})
+	d.httpClient = &http.Client{}
 	return nil
 }
 
