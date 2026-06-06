@@ -2,14 +2,20 @@ package zbrowser
 
 import (
 	"context"
+	"crypto/sha1"
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
+	"os"
 	"strings"
+	"time"
 
 	"github.com/OpenListTeam/OpenList/v4/drivers/base"
 	"github.com/OpenListTeam/OpenList/v4/internal/driver"
-	"github.com/OpenListTeam/OpenList/v4/internal/errs"
 	"github.com/OpenListTeam/OpenList/v4/internal/model"
+	"github.com/OpenListTeam/OpenList/v4/pkg/utils"
 	"github.com/go-resty/resty/v2"
 )
 
@@ -128,10 +134,14 @@ func (d *ZBrowser) Link(ctx context.Context, file model.Obj, args model.LinkArgs
 	if len(dl.Data.List.Files) == 0 {
 		return nil, fmt.Errorf("[ZBrowser] no download links returned")
 	}
+	if dl.Data.Error.SensCode != 0 {
+		return nil, fmt.Errorf("[ZBrowser] download error: %s (sensCode=%d)", dl.Data.Error.Sens, dl.Data.Error.SensCode)
+	}
 	referer := dl.Data.List.Files[0].URL
 	if idx := strings.LastIndex(referer, "/"); idx >= 0 {
 		referer = referer[:idx+1]
 	}
+	exp := 3 * 24 * time.Hour
 	return &model.Link{
 		URL: dl.Data.List.Files[0].URL,
 		Header: http.Header{
@@ -143,6 +153,7 @@ func (d *ZBrowser) Link(ctx context.Context, file model.Obj, args model.LinkArgs
 			"Accept-Language": []string{"zh-CN,zh;q=0.9"},
 			"Cookie":          []string{"__guid=" + d.GUID + "; Q=" + d.Q + "; __NS_Q=" + d.Q + "; T=" + d.T + "; __NS_T=" + d.T},
 		},
+		Expiration: &exp,
 	}, nil
 }
 
@@ -168,13 +179,8 @@ func (d *ZBrowser) Move(ctx context.Context, srcObj, dstDir model.Obj) error {
 		"newPid": dstDir.GetID(),
 		"items": []base.Json{
 			{
-				"type": func() int {
-					if srcObj.IsDir() {
-						return 1
-					}
-					return 2
-				}(),
-				"id": srcObj.GetID(),
+				"type": objType(srcObj),
+				"id":   srcObj.GetID(),
 			},
 		},
 	}, &resp)
@@ -200,10 +206,10 @@ func (d *ZBrowser) Rename(ctx context.Context, srcObj model.Obj, newName string)
 	}, nil
 }
 
-func (d *ZBrowser) Copy(ctx context.Context, srcObj, dstDir model.Obj) (model.Obj, error) {
+func (d *ZBrowser) Copy(ctx context.Context, srcObj, dstDir model.Obj) error {
 	src, ok := srcObj.(*Obj)
 	if !ok {
-		return nil, fmt.Errorf("srcObj is not a zbrowser obj")
+		return fmt.Errorf("srcObj is not a zbrowser obj")
 	}
 	var resp baseResp
 	_, err := d.apiRequest(ctx, "/v3/dir/copy", base.Json{
@@ -212,22 +218,15 @@ func (d *ZBrowser) Copy(ctx context.Context, srcObj, dstDir model.Obj) (model.Ob
 		"newPid": dstDir.GetID(),
 		"items": []base.Json{
 			{
-				"type": func() int {
-					if srcObj.IsDir() {
-						return 1
-					}
-					return 2
-				}(),
-				"id": srcObj.GetID(),
+				"type": objType(srcObj),
+				"id":   srcObj.GetID(),
 			},
 		},
 	}, &resp)
-	if err != nil {
-		return nil, err
-	}
-	return nil, nil
+	return err
 }
 
+// TODO: 批量删除 - API 的 items 支持数组，可累积多个文件后一次性删除
 func (d *ZBrowser) Remove(ctx context.Context, obj model.Obj) error {
 	src, ok := obj.(*Obj)
 	if !ok {
@@ -243,22 +242,140 @@ func (d *ZBrowser) Remove(ctx context.Context, obj model.Obj) error {
 		"ver": 0,
 		"items": []base.Json{
 			{
-				"type": func() int {
-					if obj.IsDir() {
-						return 1
-					}
-					return 2
-				}(),
-				"id": obj.GetID(),
+				"type": objType(obj),
+				"id":   obj.GetID(),
 			},
 		},
 	}, &resp)
 	return err
 }
 
+// TODO: 秒传优化 - pIndex 返回 code=0 时文件已存在，但前端仍会传输完整文件到服务器，
+//
+//	理想情况下应在 pIndex 阶段就告知前端跳过文件传输，需要前端配合实现。
 func (d *ZBrowser) Put(ctx context.Context, dstDir model.Obj, file model.FileStreamer, up driver.UpdateProgress) (model.Obj, error) {
-	// TODO upload file, optional
-	return nil, errs.NotImplement
+	// 保存到临时文件，以便计算 SHA1 和分片上传
+	tmpFile, err := os.CreateTemp("", "zbrowser-upload-*")
+	if err != nil {
+		return nil, fmt.Errorf("[ZBrowser] create temp file error: %w", err)
+	}
+	defer os.Remove(tmpFile.Name())
+	defer tmpFile.Close()
+
+	h := sha1.New()
+	writer := io.MultiWriter(h, tmpFile)
+	if _, err := io.Copy(writer, file); err != nil {
+		return nil, fmt.Errorf("[ZBrowser] save temp file error: %w", err)
+	}
+	fileHash := hex.EncodeToString(h.Sum(nil))
+	if _, err := tmpFile.Seek(0, io.SeekStart); err != nil {
+		return nil, fmt.Errorf("[ZBrowser] seek temp file error: %w", err)
+	}
+
+	pid := dstDir.GetID()
+	fileName := file.GetName()
+	fileSize := file.GetSize()
+
+	// Step 1: pIndex（预处理）
+	pIndexValue := d.xuAPIValue(map[string]any{
+		"file_hash": fileHash,
+		"file_name": fileName,
+		"file_size": fmt.Sprintf("%d", fileSize),
+		"pid":       pid,
+	})
+	pIndexJSON, _ := json.Marshal(pIndexValue)
+	var pIndexResp xuBaseResp
+	if _, err := d.xuRequest(ctx, "/v4/fu/pIndex", pIndexValue, nil, "", nil, &pIndexResp); err != nil {
+		return nil, fmt.Errorf("[ZBrowser] pIndex error: %w, request: %s", err, string(pIndexJSON))
+	}
+	if pIndexResp.Code != 0 && pIndexResp.Code != 901 {
+		return nil, fmt.Errorf("[ZBrowser] pIndex error: code=%d, msg=%s, request: %s", pIndexResp.Code, pIndexResp.Msg, string(pIndexJSON))
+	}
+
+	// 秒传：pIndex 返回 code=0 时文件已存在，直接返回
+	if pIndexResp.Code == 0 {
+		var pIndexData uploadConfirmData
+		if err := json.Unmarshal(pIndexResp.Data, &pIndexData); err == nil && pIndexData.ID != "" {
+			up(100)
+			return &model.Object{
+				ID:       pIndexData.ID,
+				Name:     fileName,
+				Size:     fileSize,
+				Modified: time.Now(),
+				IsFolder: false,
+				HashInfo: utils.NewHashInfo(utils.SHA1, fileHash),
+			}, nil
+		}
+	}
+
+	// Step 2: 分片上传
+	const chunkSize int64 = 64 * 1024 * 1024 // 64 MiB
+	totalChunks := int((fileSize + chunkSize - 1) / chunkSize)
+	if totalChunks == 0 {
+		totalChunks = 1 // 空文件也发一个分片
+	}
+
+	for chunkNumber := 1; chunkNumber <= totalChunks; chunkNumber++ {
+		remain := fileSize - int64(chunkNumber-1)*chunkSize
+		thisChunk := chunkSize
+		if remain < thisChunk {
+			thisChunk = remain
+		}
+
+		chunkValue := d.xuAPIValue(map[string]any{
+			"chunkNumber":  chunkNumber,
+			"file_hash":    fileHash,
+			"pid":          pid,
+			"relativePath": fileName,
+			"resume":       0,
+			"totalSize":    fmt.Sprintf("%d", fileSize),
+			"finish":       0,
+		})
+
+		chunkReader := io.LimitReader(tmpFile, thisChunk)
+		chunkJSON, _ := json.Marshal(chunkValue)
+		var uploadResp xuBaseResp
+		if _, err := d.xuRequest(ctx, "/v4/fu/index", chunkValue, chunkReader, fileName, nil, &uploadResp); err != nil {
+			return nil, fmt.Errorf("[ZBrowser] upload chunk %d/%d error: %w, request: %s", chunkNumber, totalChunks, err, string(chunkJSON))
+		}
+		if uploadResp.Code != 0 {
+			return nil, fmt.Errorf("[ZBrowser] upload chunk %d/%d error: code=%d, msg=%s, request: %s", chunkNumber, totalChunks, uploadResp.Code, uploadResp.Msg, string(chunkJSON))
+		}
+		up(float64(chunkNumber) / float64(totalChunks+1) * 100)
+	}
+
+	// Step 3: 确认上传
+	confirmValue := d.xuAPIValue(map[string]any{
+		"chunkNumber":  totalChunks,
+		"file_hash":    fileHash,
+		"pid":          pid,
+		"relativePath": fileName,
+		"resume":       0,
+		"totalSize":    fmt.Sprintf("%d", fileSize),
+		"finish":       1,
+	})
+	var confirmResp xuBaseResp
+	if _, err := d.xuRequest(ctx, "/v4/fu/index", confirmValue, nil, fileName, nil, &confirmResp); err != nil {
+		return nil, fmt.Errorf("[ZBrowser] confirm error: %w", err)
+	}
+	if confirmResp.Code != 0 {
+		return nil, fmt.Errorf("[ZBrowser] confirm error: code=%d, msg=%s", confirmResp.Code, confirmResp.Msg)
+	}
+	up(100)
+
+	var confirmData uploadConfirmData
+	if err := json.Unmarshal(confirmResp.Data, &confirmData); err != nil {
+		return nil, fmt.Errorf("[ZBrowser] parse confirm data error: %w", err)
+	}
+
+	return &model.Object{
+		ID:       confirmData.ID,
+		Name:     fileName,
+		Size:     fileSize,
+		Modified: time.Now(),
+		IsFolder: false,
+		HashInfo: utils.NewHashInfo(utils.SHA1, fileHash),
+	}, nil
 }
 
 func (d *ZBrowser) GetDetails(ctx context.Context) (*model.StorageDetails, error) {

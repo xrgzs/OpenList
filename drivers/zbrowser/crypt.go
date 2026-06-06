@@ -30,7 +30,7 @@ func Encrypt(plaintext []byte) (string, error) {
 	ciphertext := make([]byte, len(padded))
 	cipher.NewCBCEncrypter(block, cryptIV).CryptBlocks(ciphertext, padded)
 
-	return base64.RawURLEncoding.EncodeToString(ciphertext), nil
+	return base64.URLEncoding.EncodeToString(ciphertext), nil
 }
 
 // Decrypt decrypts a URL-safe base64 encoded (optionally padded) ciphertext

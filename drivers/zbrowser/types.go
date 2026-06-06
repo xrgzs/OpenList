@@ -1,6 +1,7 @@
 package zbrowser
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/OpenListTeam/OpenList/v4/internal/model"
@@ -146,6 +147,18 @@ type dirNewRespV3 struct {
 			UpdatedAt    int64  `json:"updatedAt"`
 		} `json:"model"`
 	} `json:"data"`
+}
+
+type xuBaseResp struct {
+	Code int             `json:"code"`
+	Msg  string          `json:"msg"`
+	Flag int             `json:"flag"`
+	Data json.RawMessage `json:"data"`
+}
+
+type uploadConfirmData struct {
+	DirID string `json:"dir_id"`
+	ID    string `json:"id"`
 }
 
 type userSpaceResp struct {
