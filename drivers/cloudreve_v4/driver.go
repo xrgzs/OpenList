@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -163,15 +164,59 @@ func (d *CloudreveV4) Link(ctx context.Context, file model.Obj, args model.LinkA
 	if len(url.Urls) == 0 {
 		return nil, errors.New("server returns no url")
 	}
-	exp := time.Until(url.Expires)
+	exp := getFileURLExpiration(url.Urls[0].URL, url.Expires)
 	return &model.Link{
 		URL:        url.Urls[0].URL,
-		Expiration: &exp,
+		Expiration: exp,
 		Header: http.Header{
 			"Referer":    {d.Address},
 			"User-Agent": {d.getUA()},
 		},
 	}, nil
+}
+
+func getFileURLExpiration(rawURL string, crExpires time.Time) *time.Duration {
+	s3Expires, ok := parseS3SignedURLExpiration(rawURL)
+	if !ok {
+		exp := time.Until(crExpires)
+		return &exp
+	}
+
+	if s3Expires.Sub(crExpires) < 5*time.Minute {
+		exp := time.Until(s3Expires) - 30*time.Minute
+		if exp <= 0 {
+			return nil
+		}
+		return &exp
+	}
+
+	exp := time.Until(crExpires)
+	return &exp
+}
+
+func parseS3SignedURLExpiration(rawURL string) (time.Time, bool) {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return time.Time{}, false
+	}
+
+	q := u.Query()
+	amzDate := q.Get("X-Amz-Date")
+	amzExpires := q.Get("X-Amz-Expires")
+	if amzDate == "" || amzExpires == "" {
+		return time.Time{}, false
+	}
+
+	signedAt, err := time.Parse("20060102T150405Z", amzDate)
+	if err != nil {
+		return time.Time{}, false
+	}
+	expiresSeconds, err := strconv.ParseInt(amzExpires, 10, 64)
+	if err != nil || expiresSeconds <= 0 {
+		return time.Time{}, false
+	}
+
+	return signedAt.Add(time.Duration(expiresSeconds) * time.Second), true
 }
 
 func (d *CloudreveV4) MakeDir(ctx context.Context, parentDir model.Obj, dirName string) error {
