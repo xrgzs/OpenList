@@ -151,23 +151,25 @@ func (d *CloudreveV4) Get(ctx context.Context, path string) (model.Obj, error) {
 }
 
 func (d *CloudreveV4) Link(ctx context.Context, file model.Obj, args model.LinkArgs) (*model.Link, error) {
-	var url FileUrlResp
-	err := d.request(http.MethodPost, "/file/url", func(req *resty.Request) {
-		req.SetBody(base.Json{
-			"uris":     []string{file.GetPath()},
-			"download": true,
-		})
-	}, &url)
+	fileURL, err := d.getFileURL(file.GetPath(), false)
 	if err != nil {
 		return nil, err
 	}
-	if len(url.Urls) == 0 {
-		return nil, errors.New("server returns no url")
+
+	signedExpires, signed := parseObjectStorageSignedURLExpiration(fileURL.Urls[0].URL)
+	cacheDecision := decideFileURLCache(signedExpires, signed, fileURL.Expires, true)
+	if cacheDecision.RefreshNoCache {
+		fileURL, err = d.getFileURL(file.GetPath(), true)
+		if err != nil {
+			return nil, err
+		}
+		signedExpires, signed = parseObjectStorageSignedURLExpiration(fileURL.Urls[0].URL)
+		cacheDecision = decideFileURLCache(signedExpires, signed, fileURL.Expires, false)
 	}
-	exp := getFileURLExpiration(url.Urls[0].URL, url.Expires)
+
 	return &model.Link{
-		URL:        url.Urls[0].URL,
-		Expiration: exp,
+		URL:        fileURL.Urls[0].URL,
+		Expiration: cacheDecision.Expiration,
 		Header: http.Header{
 			"Referer":    {d.Address},
 			"User-Agent": {d.getUA()},
@@ -175,48 +177,112 @@ func (d *CloudreveV4) Link(ctx context.Context, file model.Obj, args model.LinkA
 	}, nil
 }
 
-func getFileURLExpiration(rawURL string, crExpires time.Time) *time.Duration {
-	s3Expires, ok := parseS3SignedURLExpiration(rawURL)
-	if !ok {
-		exp := time.Until(crExpires)
-		return &exp
+func (d *CloudreveV4) getFileURL(path string, noCache bool) (*FileUrlResp, error) {
+	var fileURL FileUrlResp
+	body := base.Json{
+		"uris":     []string{path},
+		"download": true,
 	}
-
-	if s3Expires.Sub(crExpires) < 5*time.Minute {
-		exp := time.Until(s3Expires) - 30*time.Minute
-		if exp <= 0 {
-			return nil
-		}
-		return &exp
+	if noCache {
+		body["no_cache"] = true
 	}
-
-	exp := time.Until(crExpires)
-	return &exp
+	err := d.request(http.MethodPost, "/file/url", func(req *resty.Request) {
+		req.SetBody(body)
+	}, &fileURL)
+	if err != nil {
+		return nil, err
+	}
+	if len(fileURL.Urls) == 0 {
+		return nil, errors.New("server returns no url")
+	}
+	return &fileURL, nil
 }
 
-func parseS3SignedURLExpiration(rawURL string) (time.Time, bool) {
+type fileURLCacheDecision struct {
+	Expiration     *time.Duration
+	RefreshNoCache bool
+}
+
+type signedURLExpiration struct {
+	ExpiresAt time.Time
+	ValidFor  time.Duration
+}
+
+const (
+	fileURLCacheSafeMargin = 10 * time.Minute
+	// Only refresh long-lived signatures: after keeping a 10-minute safety margin,
+	// the refreshed URL should still have at least another 10 minutes worth caching.
+	fileURLRefreshMinSignedTTL = fileURLCacheSafeMargin + 10*time.Minute
+)
+
+func decideFileURLCache(signedExpires signedURLExpiration, signed bool, crExpires time.Time, allowRefresh bool) fileURLCacheDecision {
+	now := time.Now()
+	if signed {
+		return decideSignedFileURLCache(signedExpires, allowRefresh, now)
+	}
+	return decideDefaultFileURLCache(crExpires, now)
+}
+
+func decideSignedFileURLCache(signedExpires signedURLExpiration, allowRefresh bool, now time.Time) fileURLCacheDecision {
+	// Signed object storage URLs carry their real expiration in the URL itself.
+	// Cloudreve's expires field is a default entity URL TTL, so it must not cap
+	// signed URL cache time.
+	exp := signedExpires.ExpiresAt.Add(-fileURLCacheSafeMargin).Sub(now)
+	if exp > 0 {
+		return fileURLCacheDecision{Expiration: &exp}
+	}
+
+	if allowRefresh && (now.After(signedExpires.ExpiresAt) || signedExpires.ValidFor > fileURLRefreshMinSignedTTL) {
+		return fileURLCacheDecision{RefreshNoCache: true}
+	}
+	return fileURLCacheDecision{}
+}
+
+func decideDefaultFileURLCache(crExpires time.Time, now time.Time) fileURLCacheDecision {
+	exp := crExpires.Sub(now) * 3 / 4
+	if exp <= 0 {
+		return fileURLCacheDecision{}
+	}
+	return fileURLCacheDecision{Expiration: &exp}
+}
+
+func parseObjectStorageSignedURLExpiration(rawURL string) (signedURLExpiration, bool) {
+	return parseS3SignedURLExpiration(rawURL)
+}
+
+func parseS3SignedURLExpiration(rawURL string) (signedURLExpiration, bool) {
 	u, err := url.Parse(rawURL)
 	if err != nil {
-		return time.Time{}, false
+		return signedURLExpiration{}, false
 	}
 
 	q := u.Query()
+	if q.Get("X-Amz-Algorithm") != "AWS4-HMAC-SHA256" ||
+		q.Get("X-Amz-Credential") == "" ||
+		q.Get("X-Amz-Signature") == "" {
+		return signedURLExpiration{}, false
+	}
+
 	amzDate := q.Get("X-Amz-Date")
 	amzExpires := q.Get("X-Amz-Expires")
 	if amzDate == "" || amzExpires == "" {
-		return time.Time{}, false
+		return signedURLExpiration{}, false
 	}
 
 	signedAt, err := time.Parse("20060102T150405Z", amzDate)
 	if err != nil {
-		return time.Time{}, false
+		return signedURLExpiration{}, false
 	}
 	expiresSeconds, err := strconv.ParseInt(amzExpires, 10, 64)
 	if err != nil || expiresSeconds <= 0 {
-		return time.Time{}, false
+		return signedURLExpiration{}, false
 	}
 
-	return signedAt.Add(time.Duration(expiresSeconds) * time.Second), true
+	validFor := time.Duration(expiresSeconds) * time.Second
+	return signedURLExpiration{
+		ExpiresAt: signedAt.Add(validFor),
+		ValidFor:  validFor,
+	}, true
 }
 
 func (d *CloudreveV4) MakeDir(ctx context.Context, parentDir model.Obj, dirName string) error {
