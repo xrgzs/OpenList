@@ -8,7 +8,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"os"
 	"strings"
 	"time"
 
@@ -107,19 +106,6 @@ func (d *ZBrowser) xuRequest(ctx context.Context, path string, value any, file i
 			return nil, fmt.Errorf("[ZBrowser] xuAPI request copy file error: %w", err)
 		}
 		b.WriteString("\r\n--" + boundary + "--\r\n")
-
-		// 调试：保存完整请求到文件
-		tmpReq, _ := os.CreateTemp("", "zbrowser-req-*.txt")
-		fmt.Fprintf(tmpReq, "POST http://xu.zbrowser.cn%s?%s HTTP/1.1\r\n", path, query.Encode())
-		for k, vv := range headers {
-			for _, v := range vv {
-				fmt.Fprintf(tmpReq, "%s: %s\r\n", k, v)
-			}
-		}
-		fmt.Fprintf(tmpReq, "Content-Length: %d\r\n\r\n", b.Len())
-		tmpReq.Write(b.Bytes())
-		tmpReq.Close()
-		fmt.Printf("[ZBrowser-debug] upload request saved to: %s\n", tmpReq.Name())
 
 		rd = bytes.NewReader(b.Bytes())
 		headers.Set("Content-Type", "multipart/form-data; boundary="+boundary)

@@ -2,19 +2,16 @@ package zbrowser
 
 import (
 	"context"
-	"crypto/sha1"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
 	"github.com/OpenListTeam/OpenList/v4/drivers/base"
 	"github.com/OpenListTeam/OpenList/v4/internal/driver"
 	"github.com/OpenListTeam/OpenList/v4/internal/model"
+	streamPkg "github.com/OpenListTeam/OpenList/v4/internal/stream"
 	"github.com/OpenListTeam/OpenList/v4/pkg/utils"
 	"github.com/go-resty/resty/v2"
 )
@@ -250,26 +247,20 @@ func (d *ZBrowser) Remove(ctx context.Context, obj model.Obj) error {
 	return err
 }
 
-// TODO: 秒传优化 - pIndex 返回 code=0 时文件已存在，但前端仍会传输完整文件到服务器，
-//
-//	理想情况下应在 pIndex 阶段就告知前端跳过文件传输，需要前端配合实现。
 func (d *ZBrowser) Put(ctx context.Context, dstDir model.Obj, file model.FileStreamer, up driver.UpdateProgress) (model.Obj, error) {
-	// 保存到临时文件，以便计算 SHA1 和分片上传
-	tmpFile, err := os.CreateTemp("", "zbrowser-upload-*")
-	if err != nil {
-		return nil, fmt.Errorf("[ZBrowser] create temp file error: %w", err)
+	fileHash := file.GetHash().GetHash(utils.SHA1)
+	var err error
+	if len(fileHash) != utils.SHA1.Width {
+		_, fileHash, err = streamPkg.CacheFullAndHash(file, &up, utils.SHA1)
+		if err != nil {
+			return nil, fmt.Errorf("[ZBrowser] calculate SHA1 error: %w", err)
+		}
 	}
-	defer os.Remove(tmpFile.Name())
-	defer tmpFile.Close()
 
-	h := sha1.New()
-	writer := io.MultiWriter(h, tmpFile)
-	if _, err := io.Copy(writer, file); err != nil {
-		return nil, fmt.Errorf("[ZBrowser] save temp file error: %w", err)
-	}
-	fileHash := hex.EncodeToString(h.Sum(nil))
-	if _, err := tmpFile.Seek(0, io.SeekStart); err != nil {
-		return nil, fmt.Errorf("[ZBrowser] seek temp file error: %w", err)
+	const chunkSize int64 = 64 * 1024 * 1024 // 64 MiB
+	ss, err := streamPkg.NewStreamSectionReader(file, int(chunkSize), &up)
+	if err != nil {
+		return nil, fmt.Errorf("[ZBrowser] create section reader error: %w", err)
 	}
 
 	pid := dstDir.GetID()
@@ -309,14 +300,15 @@ func (d *ZBrowser) Put(ctx context.Context, dstDir model.Obj, file model.FileStr
 	}
 
 	// Step 2: 分片上传
-	const chunkSize int64 = 64 * 1024 * 1024 // 64 MiB
-	totalChunks := int((fileSize + chunkSize - 1) / chunkSize)
+	totalChunks := (fileSize + chunkSize - 1) / chunkSize
 	if totalChunks == 0 {
 		totalChunks = 1 // 空文件也发一个分片
 	}
 
-	for chunkNumber := 1; chunkNumber <= totalChunks; chunkNumber++ {
-		remain := fileSize - int64(chunkNumber-1)*chunkSize
+	for chunkIndex := int64(0); chunkIndex < totalChunks; chunkIndex++ {
+		chunkNumber := chunkIndex + 1
+		offset := chunkIndex * chunkSize
+		remain := fileSize - offset
 		thisChunk := chunkSize
 		if remain < thisChunk {
 			thisChunk = remain
@@ -332,12 +324,17 @@ func (d *ZBrowser) Put(ctx context.Context, dstDir model.Obj, file model.FileStr
 			"finish":       0,
 		})
 
-		chunkReader := io.LimitReader(tmpFile, thisChunk)
+		chunkReader, err := ss.GetSectionReader(offset, thisChunk)
+		if err != nil {
+			return nil, fmt.Errorf("[ZBrowser] get chunk reader %d/%d error: %w", chunkNumber, totalChunks, err)
+		}
 		chunkJSON, _ := json.Marshal(chunkValue)
 		var uploadResp xuBaseResp
 		if _, err := d.xuRequest(ctx, "/v4/fu/index", chunkValue, chunkReader, fileName, nil, &uploadResp); err != nil {
+			ss.FreeSectionReader(chunkReader)
 			return nil, fmt.Errorf("[ZBrowser] upload chunk %d/%d error: %w, request: %s", chunkNumber, totalChunks, err, string(chunkJSON))
 		}
+		ss.FreeSectionReader(chunkReader)
 		if uploadResp.Code != 0 {
 			return nil, fmt.Errorf("[ZBrowser] upload chunk %d/%d error: code=%d, msg=%s, request: %s", chunkNumber, totalChunks, uploadResp.Code, uploadResp.Msg, string(chunkJSON))
 		}
