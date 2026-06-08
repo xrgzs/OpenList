@@ -2,6 +2,7 @@ package onedrive_sharelink
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -21,7 +22,10 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-const headerTTL = 25 * time.Minute
+const (
+	headerTTL     = 25 * time.Minute
+	directLinkTTL = 20 * time.Minute
+)
 
 type OnedriveSharelink struct {
 	model.Storage
@@ -97,6 +101,18 @@ func (d *OnedriveSharelink) Link(ctx context.Context, file model.Obj, args model
 	header, err := d.getValidHeaders(ctx)
 	if err != nil {
 		return nil, err
+	}
+
+	if args.Redirect {
+		directURL, err := d.resolveDirectDownloadURL(ctx, file, url, header)
+		if err != nil {
+			return nil, err
+		}
+		expiration := directLinkTTL
+		return &model.Link{
+			URL:        directURL,
+			Expiration: &expiration,
+		}, nil
 	}
 
 	return &model.Link{
@@ -192,6 +208,96 @@ func cloneHeader(header http.Header) http.Header {
 		return nil
 	}
 	return header.Clone()
+}
+
+func (d *OnedriveSharelink) resolveDirectDownloadURL(ctx context.Context, file model.Obj, rawURL string, header http.Header) (string, error) {
+	var errs []error
+	if obj, ok := unwrapObject(file); ok {
+		if obj.SPItemURL != "" {
+			directURL, err := d.resolveSPItemDownloadURL(ctx, obj.SPItemURL, header)
+			if err == nil {
+				return directURL, nil
+			}
+			errs = append(errs, err)
+		}
+		if obj.ContentDownloadURL != "" {
+			return obj.ContentDownloadURL, nil
+		}
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
+	if err != nil {
+		return "", err
+	}
+	req.Header = cloneHeader(header)
+	if req.Header == nil {
+		req.Header = http.Header{}
+	}
+
+	resp, err := NewNoRedirectCLient().Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	location := resp.Header.Get("Location")
+	if location == "" {
+		errs = append(errs, fmt.Errorf("download.aspx returned no redirect location, status code: %d", resp.StatusCode))
+		return "", fmt.Errorf("onedrive_sharelink: direct download URL unavailable: %v", errs)
+	}
+	u, err := req.URL.Parse(location)
+	if err != nil {
+		return "", err
+	}
+	return u.String(), nil
+}
+
+type spItemDownloadResp struct {
+	ContentDownloadURL string `json:"@content.downloadUrl"`
+}
+
+func unwrapObject(obj model.Obj) (*Object, bool) {
+	for {
+		switch o := obj.(type) {
+		case *Object:
+			return o, true
+		case model.ObjUnwrap:
+			obj = o.Unwrap()
+		default:
+			return nil, false
+		}
+	}
+}
+
+func (d *OnedriveSharelink) resolveSPItemDownloadURL(ctx context.Context, spItemURL string, header http.Header) (string, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, spItemURL, nil)
+	if err != nil {
+		return "", err
+	}
+	req.Header = cloneHeader(header)
+	if req.Header == nil {
+		req.Header = http.Header{}
+	}
+	req.Header.Set("Accept", "application/json;odata.metadata=minimal")
+
+	resp, err := NewNoRedirectCLient().Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return "", fmt.Errorf("sp item metadata request failed, status code: %d", resp.StatusCode)
+	}
+
+	var data spItemDownloadResp
+	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+		return "", err
+	}
+	if data.ContentDownloadURL == "" {
+		return "", fmt.Errorf("sp item metadata response missing @content.downloadUrl")
+	}
+	return data.ContentDownloadURL, nil
 }
 
 func (d *OnedriveSharelink) headerSnapshot() http.Header {

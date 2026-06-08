@@ -19,7 +19,6 @@ type Addition struct {
 
 var config = driver.Config{
 	Name:        "Onedrive Sharelink",
-	OnlyProxy:   true,
 	NoUpload:    true,
 	DefaultRoot: "/",
 }
