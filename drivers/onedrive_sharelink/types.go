@@ -38,6 +38,19 @@ type Object struct {
 	ContentDownloadURL string
 }
 
+type uploadSessionResp struct {
+	UploadURL string `json:"uploadUrl"`
+}
+
+type pageContextInfo struct {
+	ListURL   string `json:"listUrl"`
+	DriveInfo struct {
+		DriveURL           string `json:".driveUrl"`
+		DriveAccessToken   string `json:".driveAccessToken"`
+		DriveAccessTokenV2 string `json:".driveAccessTokenV21"`
+	} `json:"driveInfo"`
+}
+
 // fileToObj converts an Item to an Object.
 func fileToObj(f Item) *Object {
 	// Convert Size from string to int64.
