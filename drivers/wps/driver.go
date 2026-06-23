@@ -11,6 +11,7 @@ import (
 	"github.com/OpenListTeam/OpenList/v4/internal/driver"
 	"github.com/OpenListTeam/OpenList/v4/internal/errs"
 	"github.com/OpenListTeam/OpenList/v4/internal/model"
+	"github.com/OpenListTeam/OpenList/v4/pkg/cron"
 	"github.com/OpenListTeam/OpenList/v4/pkg/utils"
 	"github.com/go-resty/resty/v2"
 )
@@ -21,6 +22,7 @@ type Wps struct {
 
 	login  *loginState
 	client *resty.Client
+	cron   *cron.Cron
 }
 
 func (d *Wps) Config() driver.Config {
@@ -46,13 +48,32 @@ func (d *Wps) Init(ctx context.Context) error {
 	if !resp.IsSuccess() {
 		return fmt.Errorf("failed to check login status, status code: %d, body: %s", resp.StatusCode(), resp.String())
 	}
-	if d.login.CompanyID == 0 {
-		return fmt.Errorf("wps company id is empty, please check business account login")
+	// if d.login.CompanyID == 0 {
+	// 	return fmt.Errorf("wps company id is empty, please check business account login")
+	// }
+	if d.AutoSign {
+		d.cron = cron.NewCron(time.Hour * 6)
+		d.cron.Do(func() {
+			err := d.dailySign(ctx)
+			if err != nil {
+				utils.Log.Errorf("[WPS-%s] %+v", d.GetStorage().MountPath, err)
+				fmt.Printf("[WPS-%s] %+v\n", d.GetStorage().MountPath, err)
+			}
+		})
+		// 立即签到一次
+		err = d.dailySign(ctx)
+		if err != nil {
+			utils.Log.Errorf("[WPS-%s] %+v", d.GetStorage().MountPath, err)
+			fmt.Printf("[WPS-%s] %+v\n", d.GetStorage().MountPath, err)
+		}
 	}
 	return nil
 }
 
 func (d *Wps) Drop(ctx context.Context) error {
+	if d.cron != nil {
+		d.cron.Stop()
+	}
 	d.client = nil
 	d.login = nil
 	return nil
