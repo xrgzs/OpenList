@@ -103,7 +103,11 @@ func FsList(c *gin.Context, req *ListReq, user *model.User) {
 		WithStorageDetails: !user.IsGuest() && !setting.GetBool(conf.HideStorageDetails),
 	})
 	if err != nil {
-		common.ErrorResp(c, err, 500)
+		if errs.IsNotFoundError(err) {
+			common.ErrorResp(c, err, 404)
+		} else {
+			common.ErrorResp(c, err, 500)
+		}
 		return
 	}
 	total, objs := pagination(objs, &req.PageReq)
@@ -159,7 +163,11 @@ func FsDirs(c *gin.Context) {
 	}
 	objs, err := fs.List(c.Request.Context(), reqPath, &fs.ListArgs{})
 	if err != nil {
-		common.ErrorResp(c, err, 500)
+		if errs.IsNotFoundError(err) {
+			common.ErrorResp(c, err, 404)
+		} else {
+			common.ErrorResp(c, err, 500)
+		}
 		return
 	}
 	dirs := filterDirs(objs)
@@ -300,7 +308,11 @@ func FsGet(c *gin.Context, req *FsGetReq, user *model.User) {
 		WithStorageDetails: !user.IsGuest() && !setting.GetBool(conf.HideStorageDetails),
 	})
 	if err != nil {
-		common.ErrorResp(c, err, 500)
+		if errs.IsNotFoundError(err) {
+			common.ErrorResp(c, err, 404)
+		} else {
+			common.ErrorResp(c, err, 500)
+		}
 		return
 	}
 	var rawURL string
@@ -312,7 +324,11 @@ func FsGet(c *gin.Context, req *FsGetReq, user *model.User) {
 	}
 	if !obj.IsDir() {
 		if err != nil {
-			common.ErrorResp(c, err, 500)
+			if errs.IsNotFoundError(err) {
+				common.ErrorResp(c, err, 404)
+			} else {
+				common.ErrorResp(c, err, 500)
+			}
 			return
 		}
 		if storage.Config().MustProxy() || storage.GetStorage().WebProxy {
@@ -422,7 +438,11 @@ func FsOther(c *gin.Context) {
 	}
 	res, err := fs.Other(c.Request.Context(), req.FsOtherArgs)
 	if err != nil {
-		common.ErrorResp(c, err, 500)
+		if errs.IsNotFoundError(err) {
+			common.ErrorResp(c, err, 404)
+		} else {
+			common.ErrorResp(c, err, 500)
+		}
 		return
 	}
 	common.SuccessResp(c, res)
