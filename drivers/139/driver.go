@@ -734,7 +734,7 @@ func (d *Yun139) Put(ctx context.Context, dstDir model.Obj, stream model.FileStr
 				if err != nil {
 					return err
 				}
-				err = d.uploadPersonalParts(ctx, partInfos, moreresp.Data.PartInfos, ss, p)
+				err = d.uploadPersonalParts(ctx, batchPartInfos, moreresp.Data.PartInfos, ss, p)
 				if err != nil {
 					return err
 				}
