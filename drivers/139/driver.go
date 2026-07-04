@@ -703,10 +703,14 @@ func (d *Yun139) Put(ctx context.Context, dstDir model.Obj, stream model.FileStr
 		if resp.Data.PartInfos != nil {
 			// Progress
 			p := driver.NewProgress(size, up)
-			rateLimited := driver.NewLimitedUploadStream(ctx, stream)
+
+			ss, err := streamPkg.NewStreamSectionReader(stream, int(partSize), &up)
+			if err != nil {
+				return err
+			}
 
 			// 先上传前100个分片
-			err = d.uploadPersonalParts(ctx, partInfos, resp.Data.PartInfos, rateLimited, p)
+			err = d.uploadPersonalParts(ctx, partInfos, resp.Data.PartInfos, ss, p)
 			if err != nil {
 				return err
 			}
@@ -730,7 +734,7 @@ func (d *Yun139) Put(ctx context.Context, dstDir model.Obj, stream model.FileStr
 				if err != nil {
 					return err
 				}
-				err = d.uploadPersonalParts(ctx, partInfos, moreresp.Data.PartInfos, rateLimited, p)
+				err = d.uploadPersonalParts(ctx, partInfos, moreresp.Data.PartInfos, ss, p)
 				if err != nil {
 					return err
 				}

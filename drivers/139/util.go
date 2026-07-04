@@ -25,8 +25,10 @@ import (
 	"github.com/OpenListTeam/OpenList/v4/internal/driver"
 	"github.com/OpenListTeam/OpenList/v4/internal/model"
 	"github.com/OpenListTeam/OpenList/v4/internal/op"
+	streamPkg "github.com/OpenListTeam/OpenList/v4/internal/stream"
 	"github.com/OpenListTeam/OpenList/v4/pkg/utils"
 	"github.com/OpenListTeam/OpenList/v4/pkg/utils/random"
+	"github.com/avast/retry-go"
 	"github.com/go-resty/resty/v2"
 	jsoniter "github.com/json-iterator/go"
 	log "github.com/sirupsen/logrus"
@@ -698,7 +700,7 @@ func (d *Yun139) getGroupCloudHost() string {
 	return d.GroupCloudHost
 }
 
-func (d *Yun139) uploadPersonalParts(ctx context.Context, partInfos []PartInfo, uploadPartInfos []PersonalPartInfo, rateLimited *driver.RateLimitReader, p *driver.Progress) error {
+func (d *Yun139) uploadPersonalParts(ctx context.Context, partInfos []PartInfo, uploadPartInfos []PersonalPartInfo, ss streamPkg.StreamSectionReader, p *driver.Progress) error {
 	// 确保数组以 PartNumber 从小到大排序
 	sort.Slice(uploadPartInfos, func(i, j int) bool {
 		return uploadPartInfos[i].PartNumber < uploadPartInfos[j].PartNumber
@@ -710,31 +712,53 @@ func (d *Yun139) uploadPersonalParts(ctx context.Context, partInfos []PartInfo, 
 			return fmt.Errorf("invalid PartNumber %d: index out of bounds (partInfos length: %d)", uploadPartInfo.PartNumber, len(partInfos))
 		}
 		partSize := partInfos[index].PartSize
+		offset := partInfos[index].ParallelHashCtx.PartOffset
 		log.Debugf("[139] uploading part %+v/%+v", index, len(partInfos))
-		limitReader := io.LimitReader(rateLimited, partSize)
-		r := io.TeeReader(limitReader, p)
-		req, err := http.NewRequestWithContext(ctx, http.MethodPut, uploadPartInfo.UploadUrl, r)
-		if err != nil {
-			return err
-		}
-		req.Header.Set("Content-Type", "application/octet-stream")
-		req.Header.Set("Content-Length", fmt.Sprint(partSize))
-		req.Header.Set("Origin", "https://yun.139.com")
-		req.Header.Set("Referer", "https://yun.139.com/")
-		req.ContentLength = partSize
-		err = func() error {
-			res, err := base.HttpClient.Do(req)
-			if err != nil {
-				return err
-			}
-			defer res.Body.Close()
-			log.Debugf("[139] uploaded: %+v", res)
-			if res.StatusCode != http.StatusOK {
-				body, _ := io.ReadAll(res.Body)
-				return fmt.Errorf("unexpected status code: %d, body: %s", res.StatusCode, string(body))
-			}
-			return nil
-		}()
+
+		var rd io.ReadSeeker
+		err := retry.Do(
+			func() error {
+				var getErr error
+				rd, getErr = ss.GetSectionReader(offset, partSize)
+				if getErr != nil {
+					return getErr
+				}
+				_, seekErr := rd.Seek(0, io.SeekStart)
+				if seekErr != nil {
+					ss.FreeSectionReader(rd)
+					return seekErr
+				}
+				req, reqErr := http.NewRequestWithContext(ctx, http.MethodPut, uploadPartInfo.UploadUrl, io.TeeReader(rd, p))
+				if reqErr != nil {
+					ss.FreeSectionReader(rd)
+					return reqErr
+				}
+				req.Header.Set("Content-Type", "application/octet-stream")
+				req.Header.Set("Content-Length", fmt.Sprint(partSize))
+				req.Header.Set("Origin", "https://yun.139.com")
+				req.Header.Set("Referer", "https://yun.139.com/")
+				req.ContentLength = partSize
+
+				res, doErr := base.HttpClient.Do(req)
+				if doErr != nil {
+					ss.FreeSectionReader(rd)
+					return doErr
+				}
+				defer res.Body.Close()
+				log.Debugf("[139] uploaded: %+v", res)
+				if res.StatusCode != http.StatusOK {
+					body, _ := io.ReadAll(res.Body)
+					ss.FreeSectionReader(rd)
+					return fmt.Errorf("unexpected status code: %d, body: %s", res.StatusCode, string(body))
+				}
+				return nil
+			},
+			retry.Context(ctx),
+			retry.Attempts(10),
+			retry.DelayType(retry.BackOffDelay),
+			retry.Delay(time.Second),
+		)
+		ss.FreeSectionReader(rd)
 		if err != nil {
 			return err
 		}
