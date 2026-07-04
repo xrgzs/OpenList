@@ -19,6 +19,7 @@ import (
 	"github.com/OpenListTeam/OpenList/v4/pkg/cron"
 	"github.com/OpenListTeam/OpenList/v4/pkg/utils"
 	"github.com/OpenListTeam/OpenList/v4/pkg/utils/random"
+	"github.com/avast/retry-go"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -858,55 +859,84 @@ func (d *Yun139) Put(ctx context.Context, dstDir model.Obj, stream model.FileStr
 		}
 
 		size := stream.GetSize()
+		partSize := d.getPartSize(size)
+
 		// Progress
 		p := driver.NewProgress(size, up)
-		partSize := d.getPartSize(size)
+		rateLimited := driver.NewLimitedUploadStream(ctx, stream)
+
+		// StreamSectionReader for per-chunk buffering and retry
+		ss, err := streamPkg.NewStreamSectionReader(&streamPkg.FileStream{
+			Ctx:    ctx,
+			Reader: rateLimited,
+			Obj:    &model.Object{Size: size},
+		}, int(partSize), &up)
+		if err != nil {
+			return err
+		}
+
 		part := int64(1)
 		if size > partSize {
 			part = (size + partSize - 1) / partSize
 		}
-		rateLimited := driver.NewLimitedUploadStream(ctx, stream)
 		for i := int64(0); i < part; i++ {
 			if utils.IsCanceled(ctx) {
 				return ctx.Err()
 			}
-
 			start := i * partSize
 			byteSize := min(size-start, partSize)
 
-			limitReader := io.LimitReader(rateLimited, byteSize)
-			// Update Progress
-			r := io.TeeReader(limitReader, p)
-			req, err := http.NewRequestWithContext(ctx, http.MethodPost, resp.Data.UploadResult.RedirectionURL, r)
-			if err != nil {
-				return err
-			}
-			req.Header.Set("Content-Type", "text/plain;name="+unicode(stream.GetName()))
-			req.Header.Set("contentSize", strconv.FormatInt(size, 10))
-			req.Header.Set("range", fmt.Sprintf("bytes=%d-%d", start, start+byteSize-1))
-			req.Header.Set("uploadtaskID", resp.Data.UploadResult.UploadTaskID)
-			req.Header.Set("rangeType", "0")
-			req.ContentLength = byteSize
+			var rd io.ReadSeeker
+			err = retry.Do(
+				func() error {
+					var getErr error
+					rd, getErr = ss.GetSectionReader(start, byteSize)
+					if getErr != nil {
+						return getErr
+					}
+					rd.Seek(0, io.SeekStart)
+					req, reqErr := http.NewRequestWithContext(ctx, http.MethodPost, resp.Data.UploadResult.RedirectionURL,
+						io.TeeReader(rd, p))
+					if reqErr != nil {
+						return reqErr
+					}
+					req.Header.Set("Content-Type", "text/plain;name="+unicode(stream.GetName()))
+					req.Header.Set("contentSize", strconv.FormatInt(size, 10))
+					req.Header.Set("range", fmt.Sprintf("bytes=%d-%d", start, start+byteSize-1))
+					req.Header.Set("uploadtaskID", resp.Data.UploadResult.UploadTaskID)
+					req.Header.Set("rangeType", "0")
+					req.ContentLength = byteSize
 
-			res, err := base.HttpClient.Do(req)
+					res, doErr := base.HttpClient.Do(req)
+					if doErr != nil {
+						return doErr
+					}
+					defer res.Body.Close()
+					bodyBytes, readErr := io.ReadAll(res.Body)
+					if readErr != nil {
+						return fmt.Errorf("error reading response body: %v", readErr)
+					}
+					if res.StatusCode != http.StatusOK {
+						return fmt.Errorf("unexpected status code: %d, body: %s", res.StatusCode, string(bodyBytes))
+					}
+					var result InterLayerUploadResult
+					xmlErr := xml.Unmarshal(bodyBytes, &result)
+					if xmlErr != nil {
+						return fmt.Errorf("error parsing XML: %v", xmlErr)
+					}
+					if result.ResultCode != 0 {
+						return fmt.Errorf("upload failed with result code: %d, message: %s", result.ResultCode, result.Msg)
+					}
+					return nil
+				},
+				retry.Context(ctx),
+				retry.Attempts(10),
+				retry.DelayType(retry.BackOffDelay),
+				retry.Delay(time.Second),
+			)
+			ss.FreeSectionReader(rd)
 			if err != nil {
 				return err
-			}
-			if res.StatusCode != http.StatusOK {
-				res.Body.Close()
-				return fmt.Errorf("unexpected status code: %d", res.StatusCode)
-			}
-			bodyBytes, err := io.ReadAll(res.Body)
-			if err != nil {
-				return fmt.Errorf("error reading response body: %v", err)
-			}
-			var result InterLayerUploadResult
-			err = xml.Unmarshal(bodyBytes, &result)
-			if err != nil {
-				return fmt.Errorf("error parsing XML: %v", err)
-			}
-			if result.ResultCode != 0 {
-				return fmt.Errorf("upload failed with result code: %d, message: %s", result.ResultCode, result.Msg)
 			}
 		}
 		return nil
