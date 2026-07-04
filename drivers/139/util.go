@@ -339,15 +339,18 @@ func (d *Yun139) familyGetFiles(catalogID string) ([]model.Obj, error) {
 			},
 			"sortDirection": 1,
 		})
+		// 传入 catalogID 是文件夹的ID，而不是完整路径
+		// 当传入catalogID为根目录时，不能使用 catalogID
+		if catalogID == d.RootFolderID {
+			delete(data, "catalogID")
+		}
 		var resp QueryContentListResp
 		_, err := d.post("/orchestration/familyCloud-rebuild/content/v1.2/queryContentList", data, &resp)
 		if err != nil {
 			return nil, err
 		}
+		// 返回的是完整的Path: root:/<UserRootID>/<CatalogID>/.../<CatalogID>
 		path := resp.Data.Path
-		if catalogID == d.RootFolderID {
-			d.RootPath = path
-		}
 		for _, catalog := range resp.Data.CloudCatalogList {
 			f := model.Object{
 				ID:       catalog.CatalogID,
@@ -1326,7 +1329,7 @@ func (d *Yun139) getGroupRootByCloudID(cloudID string) (string, error) {
 }
 
 // getFamilyRootPath 查询 family 的上层 path（data.path）
-// 返回值已去除前缀 "root:/"（或 "root:"），直接返回纯 ID 或 path 部分，便于持久化为 RootFolderID。
+// 返回值为完整Path
 func (d *Yun139) getFamilyRootPath(cloudID string) (string, error) {
 	// 使用 v1.2 接口（代码日志中已有该请求），pageSize 取 1 足够获取 path 字段
 	pathname := "/orchestration/familyCloud-rebuild/content/v1.2/queryContentList"
@@ -1355,21 +1358,14 @@ func (d *Yun139) getFamilyRootPath(cloudID string) (string, error) {
 	if dataObj == nil {
 		return "", fmt.Errorf("invalid family response data")
 	}
-	// helper to strip "root:/" or "root:" prefix
-	stripRoot := func(s string) string {
-		s = strings.TrimSpace(s)
-		s = strings.TrimPrefix(s, "root:/")
-		s = strings.TrimPrefix(s, "root:")
-		return s
-	}
 	if p, ok := dataObj["path"].(string); ok && p != "" {
-		return stripRoot(p), nil
+		return p, nil
 	}
 	// 回退：有时 path 在 cloudCatalogList.catalogList 中
 	if cl, ok := dataObj["cloudCatalogList"].([]interface{}); ok && len(cl) > 0 {
 		if first, ok := cl[0].(map[string]interface{}); ok {
 			if p, ok := first["path"].(string); ok && p != "" {
-				return stripRoot(p), nil
+				return p, nil
 			}
 		}
 	}
