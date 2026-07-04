@@ -30,6 +30,8 @@ type Yun139 struct {
 	Account           string
 	ref               *Yun139
 	PersonalCloudHost string
+	FamilyCloudHost   string
+	GroupCloudHost    string
 	RootPath          string
 }
 
@@ -74,13 +76,23 @@ func (d *Yun139) Init(ctx context.Context) error {
 			return err
 		}
 		for _, policyItem := range resp.Data.RoutePolicyList {
-			if policyItem.ModName == "personal" {
+			switch policyItem.ModName {
+			case "personal":
 				d.PersonalCloudHost = policyItem.HttpsUrl
-				break
+			case "group":
+				d.GroupCloudHost = policyItem.HttpsUrl
+			case "family":
+				d.FamilyCloudHost = policyItem.HttpsUrl
 			}
 		}
 		if len(d.PersonalCloudHost) == 0 {
 			return fmt.Errorf("PersonalCloudHost is empty")
+		}
+		if len(d.GroupCloudHost) == 0 {
+			return fmt.Errorf("GroupCloudHost is empty")
+		}
+		if len(d.FamilyCloudHost) == 0 {
+			return fmt.Errorf("FamilyCloudHost is empty")
 		}
 
 		d.cron = cron.NewCron(time.Hour * 12)

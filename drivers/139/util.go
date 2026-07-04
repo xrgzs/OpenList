@@ -684,6 +684,20 @@ func (d *Yun139) getPersonalCloudHost() string {
 	return d.PersonalCloudHost
 }
 
+func (d *Yun139) getFamilyCloudHost() string {
+	if d.ref != nil {
+		return d.ref.getFamilyCloudHost()
+	}
+	return d.FamilyCloudHost
+}
+
+func (d *Yun139) getGroupCloudHost() string {
+	if d.ref != nil {
+		return d.ref.getGroupCloudHost()
+	}
+	return d.GroupCloudHost
+}
+
 func (d *Yun139) uploadPersonalParts(ctx context.Context, partInfos []PartInfo, uploadPartInfos []PersonalPartInfo, rateLimited *driver.RateLimitReader, p *driver.Progress) error {
 	// 确保数组以 PartNumber 从小到大排序
 	sort.Slice(uploadPartInfos, func(i, j int) bool {
@@ -884,7 +898,6 @@ func (d *Yun139) step2_get_single_token(sid string) (string, error) {
 	}
 
 	exchangePassidHeaders := map[string]string{
-		"Host":            "smsrebuild1.mail.10086.cn",
 		"Cookie":          rmkey,
 		"Content-Type":    "text/xml; charset=utf-8",
 		"Accept-Encoding": "gzip",
@@ -1159,7 +1172,6 @@ func (d *Yun139) step3_third_party_login(dycpwd string) (string, error) {
 		"x-UserAgent":         "android|23116PN5BC|android15|1.2.6|||1440x3200|10246600",
 		"x-DeviceInfo":        "4|127.0.0.1|5|1.2.6|Xiaomi|23116PN5BC||02-00-00-00-00-00|android 15|1440x3200|android|||",
 		"Content-Type":        "text/plain;charset=UTF-8",
-		"Host":                "user-njs.yun.139.com",
 		"Accept-Encoding":     "gzip",
 		"User-Agent":          "okhttp/3.12.2",
 	}
@@ -1240,10 +1252,9 @@ func (d *Yun139) loginWithPassword() (string, error) {
 }
 
 func (d *Yun139) andAlbumRequest(pathname string, body interface{}, resp interface{}) ([]byte, error) {
-	url := "https://group.yun.139.com/hcy/family/adapter/andAlbum/openApi" + pathname
+	url := d.getFamilyCloudHost() + "/andAlbum/openApi" + pathname
 
 	headers := map[string]string{
-		"Host":                "group.yun.139.com",
 		"authorization":       "Basic " + d.getAuthorization(),
 		"x-svctype":           "2",
 		"hcy-cool-flag":       "1",
