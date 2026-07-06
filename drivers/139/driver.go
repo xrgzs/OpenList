@@ -123,6 +123,7 @@ func (d *Yun139) Init(ctx context.Context) error {
 	case MetaFamily:
 		if len(d.Addition.RootFolderID) == 0 {
 			// Attempt to obtain data.path as the root via a query and persist it.
+			d.RootFolderID = stripRootPath(d.RootFolderID)
 			if root, err := d.getFamilyRootPath(d.CloudID); err == nil && root != "" {
 				d.RootFolderID = root
 				op.MustSaveDriverStorage(d)
@@ -843,7 +844,7 @@ func (d *Yun139) Put(ctx context.Context, dstDir model.Obj, stream model.FileStr
 			},
 		}
 		pathname := "/orchestration/personalCloud/uploadAndDownload/v1.0/pcUploadFileRequest"
-		if d.isFamily() || d.Addition.Type == MetaGroup {
+		if d.isFamily() || d.isGroup() {
 			uploadPath := path.Join(dstDir.GetPath(), dstDir.GetID())
 			// if dstDir is root folder
 			if dstDir.GetID() == d.RootFolderID {
