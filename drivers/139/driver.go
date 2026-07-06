@@ -32,7 +32,6 @@ type Yun139 struct {
 	PersonalCloudHost string
 	FamilyCloudHost   string
 	GroupCloudHost    string
-	RootPath          string
 }
 
 func (d *Yun139) Config() driver.Config {
@@ -226,7 +225,7 @@ func (d *Yun139) MakeDir(ctx context.Context, parentDir model.Obj, dirName strin
 				"accountType": 1,
 			},
 			"docLibName": dirName,
-			"path":       path.Join(parentDir.GetPath(), parentDir.GetID()),
+			"path":       d.dirPath(parentDir),
 		}
 		pathname := "/orchestration/familyCloud-rebuild/cloudCatalog/v1.0/createCloudDoc"
 		_, err = d.post(pathname, data, nil)
@@ -239,7 +238,7 @@ func (d *Yun139) MakeDir(ctx context.Context, parentDir model.Obj, dirName strin
 			},
 			"groupID":      d.CloudID,
 			"parentFileId": parentDir.GetID(),
-			"path":         path.Join(parentDir.GetPath(), parentDir.GetID()),
+			"path":         d.dirPath(parentDir),
 		}
 		pathname := "/orchestration/group-rebuild/catalog/v1.0/createGroupCatalog"
 		_, err = d.post(pathname, data, nil)
@@ -324,9 +323,9 @@ func (d *Yun139) Move(ctx context.Context, srcObj, dstDir model.Obj) (model.Obj,
 		var contentList []string
 		var catalogList []string
 		if srcObj.IsDir() {
-			catalogList = append(catalogList, path.Join(srcObj.GetPath(), srcObj.GetID()))
+			catalogList = append(catalogList, d.dirPath(srcObj))
 		} else {
-			contentList = append(contentList, path.Join(srcObj.GetPath(), srcObj.GetID()))
+			contentList = append(contentList, d.dirPath(srcObj))
 		}
 
 		body := base.Json{
@@ -338,7 +337,7 @@ func (d *Yun139) Move(ctx context.Context, srcObj, dstDir model.Obj) (model.Obj,
 			"contentList":   contentList,
 			"destCatalogID": dstDir.GetID(),
 			"destGroupID":   d.CloudID,
-			"destPath":      path.Join(dstDir.GetPath(), dstDir.GetID()),
+			"destPath":      d.dirPath(dstDir),
 			"destType":      0,
 			"srcGroupID":    d.CloudID,
 			"srcType":       0,
@@ -439,7 +438,7 @@ func (d *Yun139) Rename(ctx context.Context, srcObj model.Obj, newName string) e
 				},
 				"docLibName":   newName,
 				"docLibraryID": srcObj.GetID(),
-				"path":         path.Join(srcObj.GetPath(), srcObj.GetID()),
+				"path":         d.dirPath(srcObj),
 			}
 			var resp ModifyCloudDocV2Resp
 			_, err = d.andAlbumRequest(pathname, data, &resp)
@@ -845,11 +844,7 @@ func (d *Yun139) Put(ctx context.Context, dstDir model.Obj, stream model.FileStr
 		}
 		pathname := "/orchestration/personalCloud/uploadAndDownload/v1.0/pcUploadFileRequest"
 		if d.isFamily() || d.isGroup() {
-			uploadPath := path.Join(dstDir.GetPath(), dstDir.GetID())
-			// if dstDir is root folder
-			if dstDir.GetID() == d.RootFolderID {
-				uploadPath = d.RootPath
-			}
+			uploadPath := d.dirPath(dstDir)
 			data = d.newJson(base.Json{
 				"fileCount":    1,
 				"manualRename": 2,

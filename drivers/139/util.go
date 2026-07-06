@@ -357,10 +357,6 @@ func (d *Yun139) familyGetFiles(catalogID string) ([]model.Obj, error) {
 		}
 		// 返回的是完整的Path: root:/<UserRootID>/<CatalogID>/.../<CatalogID>
 		path := resp.Data.Path
-		if catalogID == d.RootFolderID {
-			path = ensureRootPath(d.RootPath)
-			d.RootPath = path
-		}
 		for _, catalog := range resp.Data.CloudCatalogList {
 			f := model.Object{
 				ID:       catalog.CatalogID,
@@ -416,9 +412,6 @@ func (d *Yun139) groupGetFiles(catalogID string) ([]model.Obj, error) {
 			return nil, err
 		}
 		path := resp.Data.GetGroupContentResult.ParentCatalogID
-		if catalogID == d.RootFolderID {
-			d.RootPath = path
-		}
 		for _, catalog := range resp.Data.GetGroupContentResult.CatalogList {
 			f := model.Object{
 				ID:       catalog.CatalogID,
@@ -1371,20 +1364,26 @@ func (d *Yun139) getGroupRootByCloudID(cloudID string) (string, error) {
 	return "", fmt.Errorf("no root found in group response")
 }
 
+// dirPath returns the full path for a directory object.
+// For family root (Path="" from framework), needs "root:/"+id prefix.
+// Non-root objects already have their API path in GetPath() from List responses.
+func (d *Yun139) dirPath(dir model.Obj) string {
+	p := dir.GetPath()
+	id := dir.GetID()
+	if p == "" {
+		if d.isFamily() {
+			return "root:/" + id
+		}
+		return id
+	}
+	return path.Join(p, id)
+}
+
 // helper to strip "root:/" or "root:" prefix
 func stripRootPath(s string) string {
 	s = strings.TrimSpace(s)
 	s = strings.TrimPrefix(s, "root:/")
 	s = strings.TrimPrefix(s, "root:")
-	return s
-}
-
-// helper to ensure "root:/" prefix
-func ensureRootPath(s string) string {
-	s = strings.TrimSpace(s)
-	if !strings.HasPrefix(s, "root:") {
-		s = "root:/" + s
-	}
 	return s
 }
 
