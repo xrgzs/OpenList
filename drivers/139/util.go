@@ -1379,14 +1379,6 @@ func (d *Yun139) dirPath(dir model.Obj) string {
 	return path.Join(p, id)
 }
 
-// helper to strip "root:/" or "root:" prefix
-func stripRootPath(s string) string {
-	s = strings.TrimSpace(s)
-	s = strings.TrimPrefix(s, "root:/")
-	s = strings.TrimPrefix(s, "root:")
-	return s
-}
-
 // getFamilyRootPath 查询 family 的上层 path（data.path）
 // 返回值已去除前缀 "root:/"（或 "root:"），直接返回纯 ID 或 path 部分，便于持久化为 RootFolderID。
 func (d *Yun139) getFamilyRootPath(cloudID string) (string, error) {
@@ -1417,14 +1409,21 @@ func (d *Yun139) getFamilyRootPath(cloudID string) (string, error) {
 	if dataObj == nil {
 		return "", fmt.Errorf("invalid family response data")
 	}
+	// helper to strip "root:/" or "root:" prefix
+	stripRoot := func(s string) string {
+		s = strings.TrimSpace(s)
+		s = strings.TrimPrefix(s, "root:/")
+		s = strings.TrimPrefix(s, "root:")
+		return s
+	}
 	if p, ok := dataObj["path"].(string); ok && p != "" {
-		return stripRootPath(p), nil
+		return stripRoot(p), nil
 	}
 	// 回退：有时 path 在 cloudCatalogList.catalogList 中
 	if cl, ok := dataObj["cloudCatalogList"].([]interface{}); ok && len(cl) > 0 {
 		if first, ok := cl[0].(map[string]interface{}); ok {
 			if p, ok := first["path"].(string); ok && p != "" {
-				return stripRootPath(p), nil
+				return stripRoot(p), nil
 			}
 		}
 	}

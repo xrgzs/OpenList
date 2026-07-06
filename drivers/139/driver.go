@@ -122,7 +122,6 @@ func (d *Yun139) Init(ctx context.Context) error {
 	case MetaFamily:
 		if len(d.Addition.RootFolderID) == 0 {
 			// Attempt to obtain data.path as the root via a query and persist it.
-			d.RootFolderID = stripRootPath(d.RootFolderID)
 			if root, err := d.getFamilyRootPath(d.CloudID); err == nil && root != "" {
 				d.RootFolderID = root
 				op.MustSaveDriverStorage(d)
