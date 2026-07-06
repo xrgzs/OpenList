@@ -755,7 +755,7 @@ func (d *Yun139) uploadPersonalParts(ctx context.Context, partInfos []PartInfo, 
 				return nil
 			},
 			retry.Context(ctx),
-			retry.Attempts(10),
+			retry.Attempts(3),
 			retry.DelayType(retry.BackOffDelay),
 			retry.Delay(time.Second),
 		)
