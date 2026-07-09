@@ -2,13 +2,11 @@ package github_releases
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	stdpath "path"
 	"strings"
 
-	"github.com/OpenListTeam/OpenList/v4/drivers/base"
 	"github.com/OpenListTeam/OpenList/v4/internal/driver"
 	"github.com/OpenListTeam/OpenList/v4/internal/errs"
 	"github.com/OpenListTeam/OpenList/v4/internal/model"
@@ -181,101 +179,6 @@ func (d *GithubReleases) Link(ctx context.Context, file model.Obj, args model.Li
 		Header: http.Header{},
 	}
 	return &link, nil
-}
-
-// getLatestRelease 获取最新 release
-func (d *GithubReleases) getLatestRelease(repo string) (*Release, error) {
-	resp, err := d.githubGet("https://api.github.com/repos/" + repo + "/releases/latest")
-	if err != nil {
-		return nil, err
-	}
-	release := new(Release)
-	if err := json.Unmarshal(resp, release); err != nil {
-		return nil, err
-	}
-	return release, nil
-}
-
-// getAllReleases 获取所有 releases（支持自动翻页）
-func (d *GithubReleases) getAllReleases(repo string) ([]Release, error) {
-	perPage := d.Addition.PerPage
-	if perPage < 1 {
-		perPage = 30
-	} else if perPage > 100 {
-		perPage = 100
-	}
-
-	maxPage := d.Addition.MaxPage
-	if maxPage < 0 {
-		maxPage = 0
-	}
-
-	allReleases := make([]Release, 0)
-	page := 1
-
-	for {
-		url := fmt.Sprintf("https://api.github.com/repos/%s/releases?per_page=%d&page=%d", repo, perPage, page)
-		resp, err := d.githubGet(url)
-		if err != nil {
-			return nil, err
-		}
-
-		releases := make([]Release, 0)
-		if err := json.Unmarshal(resp, &releases); err != nil {
-			return nil, err
-		}
-
-		if len(releases) == 0 {
-			break
-		}
-
-		allReleases = append(allReleases, releases...)
-
-		// 达到最大页数限制
-		if maxPage > 0 && page >= maxPage {
-			break
-		}
-
-		// 如果返回数量小于 perPage，说明是最后一页
-		if len(releases) < perPage {
-			break
-		}
-
-		page++
-	}
-
-	return allReleases, nil
-}
-
-// fetchRepoFiles 获取仓库根目录文件列表
-func (d *GithubReleases) fetchRepoFiles(repo string) ([]FileInfo, error) {
-	resp, err := d.githubGet("https://api.github.com/repos/" + repo + "/contents")
-	if err != nil {
-		return nil, err
-	}
-	files := make([]FileInfo, 0)
-	if err := json.Unmarshal(resp, &files); err != nil {
-		return nil, err
-	}
-	return files, nil
-}
-
-// githubGet 发送 GitHub API GET 请求
-func (d *GithubReleases) githubGet(url string) ([]byte, error) {
-	req := base.RestyClient.R()
-	req.SetHeader("Accept", "application/vnd.github+json")
-	req.SetHeader("X-GitHub-Api-Version", "2022-11-28")
-	if d.Addition.Token != "" {
-		req.SetHeader("Authorization", fmt.Sprintf("Bearer %s", d.Addition.Token))
-	}
-	res, err := req.Get(url)
-	if err != nil {
-		return nil, err
-	}
-	if res.StatusCode() != 200 {
-		return nil, fmt.Errorf("github api error: status %d", res.StatusCode())
-	}
-	return res.Body(), nil
 }
 
 func (d *GithubReleases) MakeDir(ctx context.Context, parentDir model.Obj, dirName string) (model.Obj, error) {

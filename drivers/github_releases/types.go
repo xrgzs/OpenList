@@ -7,7 +7,7 @@ import (
 	"github.com/OpenListTeam/OpenList/v4/pkg/utils"
 )
 
-// MountPoint 表示一个仓库挂载点，不再持有缓存数据
+// MountPoint 表示一个仓库挂载点
 type MountPoint struct {
 	Point string // 挂载点路径
 	Repo  string // 仓库名 owner/repo
