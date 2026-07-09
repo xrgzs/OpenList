@@ -196,17 +196,55 @@ func (d *GithubReleases) getLatestRelease(repo string) (*Release, error) {
 	return release, nil
 }
 
-// getAllReleases 获取所有 releases
+// getAllReleases 获取所有 releases（支持自动翻页）
 func (d *GithubReleases) getAllReleases(repo string) ([]Release, error) {
-	resp, err := d.githubGet("https://api.github.com/repos/" + repo + "/releases")
-	if err != nil {
-		return nil, err
+	perPage := d.Addition.PerPage
+	if perPage < 1 {
+		perPage = 30
+	} else if perPage > 100 {
+		perPage = 100
 	}
-	releases := make([]Release, 0)
-	if err := json.Unmarshal(resp, &releases); err != nil {
-		return nil, err
+
+	maxPage := d.Addition.MaxPage
+	if maxPage < 0 {
+		maxPage = 0
 	}
-	return releases, nil
+
+	allReleases := make([]Release, 0)
+	page := 1
+
+	for {
+		url := fmt.Sprintf("https://api.github.com/repos/%s/releases?per_page=%d&page=%d", repo, perPage, page)
+		resp, err := d.githubGet(url)
+		if err != nil {
+			return nil, err
+		}
+
+		releases := make([]Release, 0)
+		if err := json.Unmarshal(resp, &releases); err != nil {
+			return nil, err
+		}
+
+		if len(releases) == 0 {
+			break
+		}
+
+		allReleases = append(allReleases, releases...)
+
+		// 达到最大页数限制
+		if maxPage > 0 && page >= maxPage {
+			break
+		}
+
+		// 如果返回数量小于 perPage，说明是最后一页
+		if len(releases) < perPage {
+			break
+		}
+
+		page++
+	}
+
+	return allReleases, nil
 }
 
 // fetchRepoFiles 获取仓库根目录文件列表
