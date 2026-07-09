@@ -193,7 +193,11 @@ func NewStreamSectionReader(file model.FileStreamer, sectionSize int, up *model.
 		return nil, err
 	}
 	file.Add(hc)
-	return &hybridSectionReader{file: file, hc: hc}, nil
+	return &hybridSectionReader{
+		file:          file,
+		hc:            hc,
+		prefetchTotal: file.GetSize(),
+	}, nil
 }
 
 type cachedSectionReader struct {
@@ -214,6 +218,16 @@ type hybridSectionReader struct {
 	hc         *hcache.HybridCache
 	mu         sync.Mutex
 	cache      []buffer.Block
+
+	// 预读相关
+	prefetchCh     chan prefetchResult
+	prefetchCancel context.CancelFunc
+	prefetchBlock  buffer.Block // 预读完成后的 block
+	prefetchTotal  int64
+}
+
+type prefetchResult struct {
+	err error
 }
 
 // 线程不安全
@@ -221,6 +235,7 @@ func (ss *hybridSectionReader) DiscardSection(off int64, length int64) error {
 	if off != ss.fileOffset {
 		return fmt.Errorf("stream not cached: request offset %d != current offset %d", off, ss.fileOffset)
 	}
+	ss.stopPrefetch()
 	n, err := utils.CopyWithBufferN(io.Discard, ss.file, length)
 	ss.fileOffset += n
 	if err != nil {
@@ -239,6 +254,30 @@ func (ss *hybridSectionReader) GetSectionReader(off, length int64) (io.ReadSeeke
 	if off != ss.fileOffset {
 		return nil, fmt.Errorf("stream not cached: request offset %d != current offset %d", off, ss.fileOffset)
 	}
+
+	// 等待预读完成
+	if ss.prefetchCh != nil {
+		result := <-ss.prefetchCh
+		ss.prefetchCh = nil
+		if result.err != nil {
+			return nil, result.err
+		}
+	}
+
+	// 使用预读的 block
+	if ss.prefetchBlock != nil {
+		b := ss.prefetchBlock
+		ss.prefetchBlock = nil
+		if length == b.Size() {
+			rs := buffer.ReadAtSeekerOf(b)
+			if _, err := rs.Seek(0, io.SeekStart); err != nil {
+				return nil, fmt.Errorf("failed to seek prefetched block: %w", err)
+			}
+			return &blockRefReadSeeker{rs, b}, nil
+		}
+		return &blockRefReadSeeker{io.NewSectionReader(b, 0, length), b}, nil
+	}
+
 	b := ss.get()
 	if b == nil {
 		offset := int64(ss.hc.Size())
@@ -261,6 +300,13 @@ func (ss *hybridSectionReader) GetSectionReader(off, length int64) (io.ReadSeeke
 		if written != length {
 			return nil, fmt.Errorf("failed to read all data: (expect =%d, actual =%d) %w", length, written, err)
 		}
+	}
+
+	// 启动下一个分片的预读
+	nextOff := ss.fileOffset
+	nextLen := min(length, ss.prefetchTotal-nextOff)
+	if nextLen > 0 {
+		ss.startPrefetch(nextOff, nextLen)
 	}
 
 	if length == b.Size() {
@@ -295,4 +341,67 @@ func (ss *hybridSectionReader) FreeSectionReader(rs io.ReadSeeker) {
 		sr.b = nil
 		sr.ReadSeeker = nil
 	}
+}
+
+// stopPrefetch 取消正在进行的预读
+func (ss *hybridSectionReader) stopPrefetch() {
+	if ss.prefetchCancel != nil {
+		ss.prefetchCancel()
+		ss.prefetchCancel = nil
+	}
+	if ss.prefetchCh != nil {
+		<-ss.prefetchCh
+		ss.prefetchCh = nil
+	}
+	ss.prefetchBlock = nil
+}
+
+// startPrefetch 启动下一个分片的预读，在 GetSectionReader 返回后调用
+func (ss *hybridSectionReader) startPrefetch(nextOff, nextLen int64) {
+	if nextOff >= ss.prefetchTotal {
+		return // 没有下一个分片
+	}
+	ss.stopPrefetch()
+	ctx, cancel := context.WithCancel(context.Background())
+	ss.prefetchCancel = cancel
+	ch := make(chan prefetchResult, 1)
+	ss.prefetchCh = ch
+	go func() {
+		// 从池中取一个 block 用于预读
+		b := ss.get()
+		if b == nil {
+			// 没有可复用的 block，跳过预读
+			ch <- prefetchResult{}
+			return
+		}
+		ws := buffer.WriteAtSeekerOf(b)
+		if _, err := ws.Seek(0, io.SeekStart); err != nil {
+			ss.put(b)
+			ch <- prefetchResult{err: fmt.Errorf("failed to seek prefetch block: %w", err)}
+			return
+		}
+		// 使用 select 支持取消
+		done := make(chan struct{})
+		var written int64
+		var readErr error
+		go func() {
+			written, readErr = utils.CopyWithBufferN(ws, ss.file, nextLen)
+			close(done)
+		}()
+		select {
+		case <-done:
+			if readErr != nil {
+				ss.put(b)
+				ch <- prefetchResult{err: fmt.Errorf("failed to prefetch data: (expect =%d, actual =%d) %w", nextLen, written, readErr)}
+				return
+			}
+			ss.fileOffset += written
+			ss.prefetchBlock = b
+			ch <- prefetchResult{}
+		case <-ctx.Done():
+			// 预读被取消，归还 block 到池中，不泄漏
+			ss.put(b)
+			ch <- prefetchResult{err: ctx.Err()}
+		}
+	}()
 }
