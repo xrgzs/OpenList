@@ -6,7 +6,26 @@ import (
 	"strings"
 
 	"github.com/OpenListTeam/OpenList/v4/drivers/base"
+	"github.com/go-resty/resty/v2"
 )
+
+// 发送 GET 请求
+func (d *GithubReleases) GetRequest(url string) (*resty.Response, error) {
+	req := base.RestyClient.R()
+	req.SetHeader("Accept", "application/vnd.github+json")
+	req.SetHeader("X-GitHub-Api-Version", "2022-11-28")
+	if d.Addition.Token != "" {
+		req.SetHeader("Authorization", fmt.Sprintf("Bearer %s", d.Addition.Token))
+	}
+	res, err := req.Get(url)
+	if err != nil {
+		return nil, err
+	}
+	if res.StatusCode() != 200 {
+		return nil, fmt.Errorf("github api error: status %d", res.StatusCode())
+	}
+	return res, nil
+}
 
 // 解析挂载结构
 func (d *GithubReleases) ParseRepos(text string) ([]MountPoint, error) {
@@ -57,12 +76,12 @@ func GetNextDir(wholePath string, basePath string) string {
 
 // getLatestRelease 获取最新 release
 func (d *GithubReleases) getLatestRelease(repo string) (*Release, error) {
-	resp, err := d.githubGet("https://api.github.com/repos/" + repo + "/releases/latest")
+	resp, err := d.GetRequest("https://api.github.com/repos/" + repo + "/releases/latest")
 	if err != nil {
 		return nil, err
 	}
 	release := new(Release)
-	if err := json.Unmarshal(resp, release); err != nil {
+	if err := json.Unmarshal(resp.Body(), release); err != nil {
 		return nil, err
 	}
 	return release, nil
@@ -87,13 +106,13 @@ func (d *GithubReleases) getAllReleases(repo string) ([]Release, error) {
 
 	for {
 		url := fmt.Sprintf("https://api.github.com/repos/%s/releases?per_page=%d&page=%d", repo, perPage, page)
-		resp, err := d.githubGet(url)
+		resp, err := d.GetRequest(url)
 		if err != nil {
 			return nil, err
 		}
 
 		releases := make([]Release, 0)
-		if err := json.Unmarshal(resp, &releases); err != nil {
+		if err := json.Unmarshal(resp.Body(), &releases); err != nil {
 			return nil, err
 		}
 
@@ -121,31 +140,13 @@ func (d *GithubReleases) getAllReleases(repo string) ([]Release, error) {
 
 // fetchRepoFiles 获取仓库根目录文件列表
 func (d *GithubReleases) fetchRepoFiles(repo string) ([]FileInfo, error) {
-	resp, err := d.githubGet("https://api.github.com/repos/" + repo + "/contents")
+	resp, err := d.GetRequest("https://api.github.com/repos/" + repo + "/contents")
 	if err != nil {
 		return nil, err
 	}
 	files := make([]FileInfo, 0)
-	if err := json.Unmarshal(resp, &files); err != nil {
+	if err := json.Unmarshal(resp.Body(), &files); err != nil {
 		return nil, err
 	}
 	return files, nil
-}
-
-// githubGet 发送 GitHub API GET 请求
-func (d *GithubReleases) githubGet(url string) ([]byte, error) {
-	req := base.RestyClient.R()
-	req.SetHeader("Accept", "application/vnd.github+json")
-	req.SetHeader("X-GitHub-Api-Version", "2022-11-28")
-	if d.Addition.Token != "" {
-		req.SetHeader("Authorization", fmt.Sprintf("Bearer %s", d.Addition.Token))
-	}
-	res, err := req.Get(url)
-	if err != nil {
-		return nil, err
-	}
-	if res.StatusCode() != 200 {
-		return nil, fmt.Errorf("github api error: status %d", res.StatusCode())
-	}
-	return res.Body(), nil
 }
