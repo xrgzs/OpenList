@@ -2,11 +2,13 @@ package github_releases
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	stdpath "path"
 	"strings"
 
+	"github.com/OpenListTeam/OpenList/v4/drivers/base"
 	"github.com/OpenListTeam/OpenList/v4/internal/driver"
 	"github.com/OpenListTeam/OpenList/v4/internal/errs"
 	"github.com/OpenListTeam/OpenList/v4/internal/model"
@@ -45,134 +47,117 @@ func (d *GithubReleases) List(ctx context.Context, dir model.Obj, args model.Lis
 	for i := range d.points {
 		point := &d.points[i]
 
-		if !d.Addition.ShowAllVersion { // latest
-			err := point.RequestRelease(d.GetRequest, args.Refresh)
+		if !d.Addition.ShowAllVersion {
+			// latest version mode
+			release, err := d.getLatestRelease(point.Repo)
 			if err != nil {
 				log.Warnf("failed to request release for %s: %v", point.Repo, err)
+				continue
+			}
+			if release == nil {
+				continue
 			}
 
-			if point.Point == path { // 与仓库路径相同
-				if point.Release == nil {
-					if err != nil {
-						return nil, fmt.Errorf("failed to get release for %s: %w", point.Repo, err)
-					}
-					return nil, fmt.Errorf("failed to get release for %s: unknown error", point.Repo)
-				}
-				files = append(files, point.GetLatestRelease()...)
+			if point.Point == path {
+				// 当前目录就是仓库挂载点
+				files = append(files, releaseToFiles(point.Point, release)...)
 				if d.Addition.ShowReadme {
-					otherFiles, err := point.GetOtherFile(d.GetRequest, args.Refresh)
-					if err != nil {
-						return nil, fmt.Errorf("failed to get other files for %s: %w", point.Repo, err)
+					other, err := d.fetchRepoFiles(point.Repo)
+					if err == nil {
+						files = append(files, otherFiles(point.Point, other)...)
+					} else {
+						log.Warnf("failed to get other files for %s: %v", point.Repo, err)
 					}
-					files = append(files, otherFiles...)
 				}
 				if d.Addition.ShowSourceCode {
-					files = append(files, point.GetSourceCode()...)
+					files = append(files, sourceCodeFiles(point.Point, release)...)
 				}
-			} else if strings.HasPrefix(point.Point, path) { // 仓库目录的父目录
+			} else if strings.HasPrefix(point.Point, path) {
+				// 仓库目录的父目录，需要聚合显示
 				nextDir := GetNextDir(point.Point, path)
 				if nextDir == "" {
 					continue
-				}
-				if err != nil {
-					return nil, fmt.Errorf("failed to get release for %s: %w", point.Repo, err)
 				}
 
 				hasSameDir := false
 				for index := range files {
 					if files[index].GetName() == nextDir {
 						hasSameDir = true
-						files[index].Size += point.GetLatestSize()
+						files[index].Size += releaseSize(release)
 						break
 					}
 				}
 				if !hasSameDir {
-					var updateAt, createAt string
-					if point.Release != nil {
-						updateAt = point.Release.PublishedAt
-						createAt = point.Release.CreatedAt
-					}
 					files = append(files, File{
 						Path:     stdpath.Join(path, nextDir),
 						FileName: nextDir,
-						Size:     point.GetLatestSize(),
-						UpdateAt: updateAt,
-						CreateAt: createAt,
+						Size:     releaseSize(release),
+						UpdateAt: release.PublishedAt,
+						CreateAt: release.CreatedAt,
 						Type:     "dir",
 						Url:      "",
 					})
 				}
 			}
-		} else { // all version
-			err := point.RequestReleases(d.GetRequest, args.Refresh)
+		} else {
+			// all versions mode
+			releases, err := d.getAllReleases(point.Repo)
 			if err != nil {
 				log.Warnf("failed to request releases for %s: %v", point.Repo, err)
+				continue
+			}
+			if len(releases) == 0 {
+				continue
 			}
 
-			if point.Point == path { // 与仓库路径相同
-				if point.Releases == nil {
-					if err != nil {
-						return nil, fmt.Errorf("failed to get releases for %s: %w", point.Repo, err)
-					}
-					return nil, fmt.Errorf("failed to get releases for %s: unknown error", point.Repo)
-				}
-				files = append(files, point.GetAllVersion()...)
+			if point.Point == path {
+				// 当前目录就是仓库挂载点
+				files = append(files, releasesToVersionDirs(point.Point, releases)...)
 				if d.Addition.ShowReadme {
-					otherFiles, err := point.GetOtherFile(d.GetRequest, args.Refresh)
-					if err != nil {
-						return nil, fmt.Errorf("failed to get other files for %s: %w", point.Repo, err)
+					other, err := d.fetchRepoFiles(point.Repo)
+					if err == nil {
+						files = append(files, otherFiles(point.Point, other)...)
+					} else {
+						log.Warnf("failed to get other files for %s: %v", point.Repo, err)
 					}
-					files = append(files, otherFiles...)
 				}
-			} else if strings.HasPrefix(point.Point, path) { // 仓库目录的父目录
+			} else if strings.HasPrefix(point.Point, path) {
+				// 仓库目录的父目录
 				nextDir := GetNextDir(point.Point, path)
 				if nextDir == "" {
 					continue
-				}
-				if err != nil {
-					return nil, fmt.Errorf("failed to get releases for %s: %w", point.Repo, err)
 				}
 
 				hasSameDir := false
 				for index := range files {
 					if files[index].GetName() == nextDir {
 						hasSameDir = true
-						files[index].Size += point.GetAllVersionSize()
+						files[index].Size += releasesTotalSize(releases)
 						break
 					}
 				}
 				if !hasSameDir {
-					var updateAt, createAt string
-					if point.Releases != nil && len(*point.Releases) > 0 {
-						updateAt = (*point.Releases)[0].PublishedAt
-						createAt = (*point.Releases)[0].CreatedAt
-					}
 					files = append(files, File{
 						FileName: nextDir,
 						Path:     stdpath.Join(path, nextDir),
-						Size:     point.GetAllVersionSize(),
-						UpdateAt: updateAt,
-						CreateAt: createAt,
+						Size:     releasesTotalSize(releases),
+						UpdateAt: releases[0].PublishedAt,
+						CreateAt: releases[0].CreatedAt,
 						Type:     "dir",
 						Url:      "",
 					})
 				}
-			} else if strings.HasPrefix(path, point.Point) { // 仓库目录的子目录
+			} else if strings.HasPrefix(path, point.Point) {
+				// 仓库目录的子目录（某个版本）
 				tagName := GetNextDir(path, point.Point)
 				if tagName == "" {
 					continue
 				}
-				if point.Releases == nil {
-					if err != nil {
-						return nil, fmt.Errorf("failed to get releases for %s: %w", point.Repo, err)
-					}
-					return nil, fmt.Errorf("failed to get releases for %s: unknown error", point.Repo)
-				}
 
-				files = append(files, point.GetReleaseByTagName(tagName)...)
+				files = append(files, releaseAssetsByTag(point.Point, tagName, releases)...)
 
 				if d.Addition.ShowSourceCode {
-					files = append(files, point.GetSourceCodeByTagName(tagName)...)
+					files = append(files, sourceCodeFilesByTag(point.Point, releases, tagName)...)
 				}
 			}
 		}
@@ -196,6 +181,63 @@ func (d *GithubReleases) Link(ctx context.Context, file model.Obj, args model.Li
 		Header: http.Header{},
 	}
 	return &link, nil
+}
+
+// getLatestRelease 获取最新 release
+func (d *GithubReleases) getLatestRelease(repo string) (*Release, error) {
+	resp, err := d.githubGet("https://api.github.com/repos/" + repo + "/releases/latest")
+	if err != nil {
+		return nil, err
+	}
+	release := new(Release)
+	if err := json.Unmarshal(resp, release); err != nil {
+		return nil, err
+	}
+	return release, nil
+}
+
+// getAllReleases 获取所有 releases
+func (d *GithubReleases) getAllReleases(repo string) ([]Release, error) {
+	resp, err := d.githubGet("https://api.github.com/repos/" + repo + "/releases")
+	if err != nil {
+		return nil, err
+	}
+	releases := make([]Release, 0)
+	if err := json.Unmarshal(resp, &releases); err != nil {
+		return nil, err
+	}
+	return releases, nil
+}
+
+// fetchRepoFiles 获取仓库根目录文件列表
+func (d *GithubReleases) fetchRepoFiles(repo string) ([]FileInfo, error) {
+	resp, err := d.githubGet("https://api.github.com/repos/" + repo + "/contents")
+	if err != nil {
+		return nil, err
+	}
+	files := make([]FileInfo, 0)
+	if err := json.Unmarshal(resp, &files); err != nil {
+		return nil, err
+	}
+	return files, nil
+}
+
+// githubGet 发送 GitHub API GET 请求
+func (d *GithubReleases) githubGet(url string) ([]byte, error) {
+	req := base.RestyClient.R()
+	req.SetHeader("Accept", "application/vnd.github+json")
+	req.SetHeader("X-GitHub-Api-Version", "2022-11-28")
+	if d.Addition.Token != "" {
+		req.SetHeader("Authorization", fmt.Sprintf("Bearer %s", d.Addition.Token))
+	}
+	res, err := req.Get(url)
+	if err != nil {
+		return nil, err
+	}
+	if res.StatusCode() != 200 {
+		return nil, fmt.Errorf("github api error: status %d", res.StatusCode())
+	}
+	return res.Body(), nil
 }
 
 func (d *GithubReleases) MakeDir(ctx context.Context, parentDir model.Obj, dirName string) (model.Obj, error) {

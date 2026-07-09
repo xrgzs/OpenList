@@ -2,30 +2,8 @@ package github_releases
 
 import (
 	"fmt"
-	"path/filepath"
 	"strings"
-
-	"github.com/OpenListTeam/OpenList/v4/drivers/base"
-	"github.com/go-resty/resty/v2"
 )
-
-// 发送 GET 请求
-func (d *GithubReleases) GetRequest(url string) (*resty.Response, error) {
-	req := base.RestyClient.R()
-	req.SetHeader("Accept", "application/vnd.github+json")
-	req.SetHeader("X-GitHub-Api-Version", "2022-11-28")
-	if d.Addition.Token != "" {
-		req.SetHeader("Authorization", fmt.Sprintf("Bearer %s", d.Addition.Token))
-	}
-	res, err := req.Get(url)
-	if err != nil {
-		return nil, err
-	}
-	if res.StatusCode() != 200 {
-		return nil, fmt.Errorf("github api error: status %d", res.StatusCode())
-	}
-	return res, nil
-}
 
 // 解析挂载结构
 func (d *GithubReleases) ParseRepos(text string) ([]MountPoint, error) {
@@ -49,10 +27,8 @@ func (d *GithubReleases) ParseRepos(text string) ([]MountPoint, error) {
 		}
 
 		points = append(points, MountPoint{
-			Point:    path,
-			Repo:     repo,
-			Release:  nil,
-			Releases: nil,
+			Point: path,
+			Repo:  repo,
 		})
 	}
 	d.points = points
@@ -74,11 +50,4 @@ func GetNextDir(wholePath string, basePath string) string {
 		}
 	}
 	return ""
-}
-
-// 判断当前目录是否是目标目录的祖先目录
-func IsAncestorDir(parentDir string, targetDir string) bool {
-	absTargetDir, _ := filepath.Abs(targetDir)
-	absParentDir, _ := filepath.Abs(parentDir)
-	return strings.HasPrefix(absTargetDir, absParentDir)
 }
