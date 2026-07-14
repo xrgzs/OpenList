@@ -703,7 +703,12 @@ func (d *Yun139) Put(ctx context.Context, dstDir model.Obj, stream model.FileStr
 			// Progress
 			p := driver.NewProgress(size, up)
 
-			ss, err := streamPkg.NewStreamSectionReader(stream, int(partSize), &up)
+			rateLimited := driver.NewLimitedUploadStream(ctx, stream)
+			ss, err := streamPkg.NewStreamSectionReader(&streamPkg.FileStream{
+				Ctx:    ctx,
+				Reader: rateLimited,
+				Obj:    &model.Object{Size: size},
+			}, int(partSize), &up)
 			if err != nil {
 				return err
 			}
