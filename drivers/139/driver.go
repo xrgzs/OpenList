@@ -910,10 +910,14 @@ func (d *Yun139) Put(ctx context.Context, dstDir model.Obj, stream model.FileStr
 					if getErr != nil {
 						return getErr
 					}
-					rd.Seek(0, io.SeekStart)
+					if _, err := rd.Seek(0, io.SeekStart); err != nil {
+						ss.FreeSectionReader(rd)
+						return err
+					}
 					req, reqErr := http.NewRequestWithContext(ctx, http.MethodPost, resp.Data.UploadResult.RedirectionURL,
 						io.TeeReader(rd, p))
 					if reqErr != nil {
+						ss.FreeSectionReader(rd)
 						return reqErr
 					}
 					req.Header.Set("Content-Type", "text/plain;name="+unicode(stream.GetName()))
@@ -925,22 +929,27 @@ func (d *Yun139) Put(ctx context.Context, dstDir model.Obj, stream model.FileStr
 
 					res, doErr := base.HttpClient.Do(req)
 					if doErr != nil {
+						ss.FreeSectionReader(rd)
 						return doErr
 					}
 					defer res.Body.Close()
 					bodyBytes, readErr := io.ReadAll(res.Body)
 					if readErr != nil {
+						ss.FreeSectionReader(rd)
 						return fmt.Errorf("error reading response body: %v", readErr)
 					}
 					if res.StatusCode != http.StatusOK {
+						ss.FreeSectionReader(rd)
 						return fmt.Errorf("unexpected status code: %d, body: %s", res.StatusCode, string(bodyBytes))
 					}
 					var result InterLayerUploadResult
 					xmlErr := xml.Unmarshal(bodyBytes, &result)
 					if xmlErr != nil {
+						ss.FreeSectionReader(rd)
 						return fmt.Errorf("error parsing XML: %v", xmlErr)
 					}
 					if result.ResultCode != 0 {
+						ss.FreeSectionReader(rd)
 						return fmt.Errorf("upload failed with result code: %d, message: %s", result.ResultCode, result.Msg)
 					}
 					return nil
