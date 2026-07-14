@@ -14,7 +14,7 @@ type Addition struct {
 	ShowAllVersion bool   `json:"show_all_version" type:"bool" default:"false" help:"show all versions"`
 	PerPage        int    `json:"per_page" type:"number" default:"30" help:"releases per page (max 100), only works when show all versions"`
 	MaxPage        int    `json:"max_page" type:"number" default:"0" help:"max pages to fetch (0 = unlimited), only works when show all versions"`
-	GitHubProxy    string `json:"gh_proxy" type:"string" default:"" help:"GitHub proxy, e.g. https://ghproxy.net/github.com or https://gh-proxy.com/github.com "`
+	GitHubProxy    string `json:"gh_proxy" type:"string" default:"" help:"GitHub proxy, e.g. https://ghproxy.net/https://github.com or https://gh-proxy.com/https://github.com"`
 }
 
 var config = driver.Config{
