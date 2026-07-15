@@ -105,6 +105,15 @@ func (d *GithubReleases) List(ctx context.Context, dir model.Obj, args model.Lis
 				continue
 			}
 			if len(releases) == 0 {
+				// no releases but may still have repo files (e.g. README)
+				if point.Point == path && d.Addition.ShowReadme {
+					other, err := d.fetchRepoFiles(point.Repo)
+					if err == nil {
+						files = append(files, otherFiles(point.Point, other)...)
+					} else {
+						log.Warnf("failed to get other files for %s: %v", point.Repo, err)
+					}
+				}
 				continue
 			}
 
