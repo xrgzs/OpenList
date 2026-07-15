@@ -2,6 +2,7 @@ package github_releases
 
 import (
 	"path"
+	"strings"
 	"time"
 
 	"github.com/OpenListTeam/OpenList/v4/pkg/utils"
@@ -148,7 +149,8 @@ func otherFiles(point string, fileInfos []FileInfo) []File {
 		if file.Type == "dir" {
 			continue
 		}
-		if file.Name == "README.md" || file.Name == "LICENSE" || file.Name == "LICENSE.txt" || file.Name == "LICENSE.md" {
+		name := file.Name
+		if strings.EqualFold(name, "README.md") || strings.HasPrefix(name, "LICENSE") {
 			files = append(files, File{
 				Path:     path.Join(point, file.Name),
 				FileName: file.Name,
