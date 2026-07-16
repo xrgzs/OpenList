@@ -627,8 +627,22 @@ func (d *Yun139) getPartSize(size int64) int64 {
 }
 
 func (d *Yun139) Put(ctx context.Context, dstDir model.Obj, stream model.FileStreamer, up driver.UpdateProgress) error {
-	switch d.Addition.Type {
-	case MetaPersonalNew:
+	// PersonalNew 以及 Group/Family 在非旧流模式时走新上传路径
+	if d.Addition.Type == MetaPersonalNew ||
+		((d.isGroup() || d.isFamily()) && !d.UseOldStreamUpload) {
+		var createPath, getUploadUrlPath, completePath string
+		if d.isGroup() || d.isFamily() {
+			// 家庭盘和小组盘共用同一套新上传 API
+			createPath = "/dynamic/file/create"
+			getUploadUrlPath = "/dynamic/file/getUploadUrl"
+			completePath = "/dynamic/file/complete"
+		} else {
+			// MetaPersonalNew
+			createPath = "/file/create"
+			getUploadUrlPath = "/file/getUploadUrl"
+			completePath = "/file/complete"
+		}
+
 		var err error
 		fullHash := stream.GetHash().GetHash(utils.SHA256)
 		if len(fullHash) != utils.SHA256.Width {
@@ -683,9 +697,8 @@ func (d *Yun139) Put(ctx context.Context, dstDir model.Obj, stream model.FileStr
 			"type":                 "file",
 			"fileRenameMode":       "auto_rename",
 		}
-		pathname := "/file/create"
 		var resp PersonalUploadResp
-		_, err = d.personalPost(pathname, data, &resp)
+		_, err = d.newPost(createPath, data, &resp)
 		if err != nil {
 			return err
 		}
@@ -732,9 +745,8 @@ func (d *Yun139) Put(ctx context.Context, dstDir model.Obj, stream model.FileStr
 						"accountType": 1,
 					},
 				}
-				pathname := "/file/getUploadUrl"
 				var moreresp PersonalUploadUrlResp
-				_, err = d.personalPost(pathname, moredata, &moreresp)
+				_, err = d.newPost(getUploadUrlPath, moredata, &moreresp)
 				if err != nil {
 					return err
 				}
@@ -751,7 +763,7 @@ func (d *Yun139) Put(ctx context.Context, dstDir model.Obj, stream model.FileStr
 				"fileId":               resp.Data.FileId,
 				"uploadId":             resp.Data.UploadId,
 			}
-			_, err = d.personalPost("/file/complete", data, nil)
+			_, err = d.newPost(completePath, data, nil)
 			if err != nil {
 				return err
 			}
@@ -796,11 +808,11 @@ func (d *Yun139) Put(ctx context.Context, dstDir model.Obj, stream model.FileStr
 			}
 		}
 		return nil
-	case MetaPersonal:
-		fallthrough
-	case MetaGroup:
-		fallthrough
-	case MetaFamily:
+	}
+
+	// 旧上传路径
+	switch d.Addition.Type {
+	case MetaPersonal, MetaGroup, MetaFamily:
 		// 处理冲突
 		// 获取文件列表
 		files, err := d.List(ctx, dstDir, model.ListArgs{})

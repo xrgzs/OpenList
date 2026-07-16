@@ -497,8 +497,7 @@ func unicode(str string) string {
 	return textUnquoted
 }
 
-func (d *Yun139) personalRequest(pathname string, method string, callback base.ReqCallback, resp interface{}) ([]byte, error) {
-	url := d.getPersonalCloudHost() + pathname
+func (d *Yun139) newRequest(url string, method string, callback base.ReqCallback, resp interface{}) ([]byte, error) {
 	req := base.RestyClient.R()
 	randStr := random.String(16)
 	ts := time.Now().Format("2006-01-02 15:04:05")
@@ -560,7 +559,21 @@ func (d *Yun139) personalRequest(pathname string, method string, callback base.R
 }
 
 func (d *Yun139) personalPost(pathname string, data interface{}, resp interface{}) ([]byte, error) {
-	return d.personalRequest(pathname, http.MethodPost, func(req *resty.Request) {
+	return d.newRequest(d.getFamilyCloudHost()+pathname, http.MethodPost, func(req *resty.Request) {
+		req.SetBody(data)
+	}, resp)
+}
+
+func (d *Yun139) newPost(pathname string, data interface{}, resp interface{}) ([]byte, error) {
+	var url string
+	switch d.Type {
+	case MetaFamily, MetaGroup:
+		// this is on purpose
+		url = d.getGroupCloudHost() + pathname
+	default:
+		url = d.getPersonalCloudHost() + pathname
+	}
+	return d.newRequest(url, http.MethodPost, func(req *resty.Request) {
 		req.SetBody(data)
 	}, resp)
 }
