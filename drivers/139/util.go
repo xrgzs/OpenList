@@ -716,22 +716,18 @@ func (d *Yun139) uploadPersonalParts(ctx context.Context, partInfos []PartInfo, 
 		offset := partInfos[index].ParallelHashCtx.PartOffset
 		log.Debugf("[139] uploading part %+v/%+v", index, len(partInfos))
 
-		var rd io.ReadSeeker
+		rd, getErr := ss.GetSectionReader(offset, partSize)
+		if getErr != nil {
+			return getErr
+		}
+
 		err := retry.Do(
 			func() error {
-				var getErr error
-				rd, getErr = ss.GetSectionReader(offset, partSize)
-				if getErr != nil {
-					return getErr
-				}
-				_, seekErr := rd.Seek(0, io.SeekStart)
-				if seekErr != nil {
-					ss.FreeSectionReader(rd)
+				if _, seekErr := rd.Seek(0, io.SeekStart); seekErr != nil {
 					return seekErr
 				}
 				req, reqErr := http.NewRequestWithContext(ctx, http.MethodPut, uploadPartInfo.UploadUrl, io.TeeReader(rd, p))
 				if reqErr != nil {
-					ss.FreeSectionReader(rd)
 					return reqErr
 				}
 				req.Header.Set("Content-Type", "application/octet-stream")
@@ -742,14 +738,12 @@ func (d *Yun139) uploadPersonalParts(ctx context.Context, partInfos []PartInfo, 
 
 				res, doErr := base.HttpClient.Do(req)
 				if doErr != nil {
-					ss.FreeSectionReader(rd)
 					return doErr
 				}
 				defer res.Body.Close()
 				log.Debugf("[139] uploaded: %+v", res)
 				if res.StatusCode != http.StatusOK {
 					body, _ := io.ReadAll(res.Body)
-					ss.FreeSectionReader(rd)
 					return fmt.Errorf("unexpected status code: %d, body: %s", res.StatusCode, string(body))
 				}
 				return nil
