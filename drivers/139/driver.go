@@ -703,7 +703,11 @@ func (d *Yun139) Put(ctx context.Context, dstDir model.Obj, stream model.FileStr
 				return fmt.Errorf("cloud_id is required for group/family upload")
 			}
 			data["groupId"] = d.CloudID
-			data["groupType"] = 1
+			if d.isGroup() {
+				data["groupType"] = 2
+			} else if d.isFamily() {
+				data["groupType"] = 1
+			}
 			data["catalogType"] = 3
 			data["seqNo"] = random.String(32)
 		}
@@ -772,6 +776,10 @@ func (d *Yun139) Put(ctx context.Context, dstDir model.Obj, stream model.FileStr
 				"contentHashAlgorithm": "SHA256",
 				"fileId":               resp.Data.FileId,
 				"uploadId":             resp.Data.UploadId,
+			}
+			// 家庭盘和小组盘需要额外的参数
+			if d.isGroup() || d.isFamily() {
+				data["groupId"] = d.CloudID
 			}
 			_, err = d.newPost(completePath, data, nil)
 			if err != nil {
