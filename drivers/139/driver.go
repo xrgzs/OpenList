@@ -632,7 +632,7 @@ func (d *Yun139) Put(ctx context.Context, dstDir model.Obj, stream model.FileStr
 		((d.isGroup() || d.isFamily()) && !d.UseOldStreamUpload) {
 		var createPath, getUploadUrlPath, completePath string
 		if d.isGroup() || d.isFamily() {
-			// 家庭盘和小组盘共用同一套新上传 API
+			// 家庭云和共享群共用同一套新上传 API
 			createPath = "/dynamic/file/create"
 			getUploadUrlPath = "/dynamic/file/getUploadUrl"
 			completePath = "/dynamic/file/complete"
@@ -697,7 +697,7 @@ func (d *Yun139) Put(ctx context.Context, dstDir model.Obj, stream model.FileStr
 			"type":                 "file",
 			"fileRenameMode":       "auto_rename",
 		}
-		// 家庭盘和小组盘需要额外的参数
+		// 家庭云和共享群需要额外的参数
 		if d.isGroup() || d.isFamily() {
 			if d.CloudID == "" {
 				return fmt.Errorf("cloud_id is required for group/family upload")
@@ -777,7 +777,7 @@ func (d *Yun139) Put(ctx context.Context, dstDir model.Obj, stream model.FileStr
 				"fileId":               resp.Data.FileId,
 				"uploadId":             resp.Data.UploadId,
 			}
-			// 家庭盘和小组盘需要额外的参数
+			// 家庭云和共享群需要额外的参数
 			if d.isGroup() || d.isFamily() {
 				data["groupId"] = d.CloudID
 			}
