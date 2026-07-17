@@ -559,7 +559,7 @@ func (d *Yun139) newRequest(url string, method string, callback base.ReqCallback
 }
 
 func (d *Yun139) personalPost(pathname string, data interface{}, resp interface{}) ([]byte, error) {
-	return d.newRequest(d.getFamilyCloudHost()+pathname, http.MethodPost, func(req *resty.Request) {
+	return d.newRequest(d.getPersonalCloudHost()+pathname, http.MethodPost, func(req *resty.Request) {
 		req.SetBody(data)
 	}, resp)
 }
