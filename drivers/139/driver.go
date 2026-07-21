@@ -87,11 +87,13 @@ func (d *Yun139) Init(ctx context.Context) error {
 		if len(d.PersonalCloudHost) == 0 {
 			return fmt.Errorf("PersonalCloudHost is empty")
 		}
-		if len(d.GroupCloudHost) == 0 {
-			return fmt.Errorf("GroupCloudHost is empty")
-		}
-		if len(d.FamilyCloudHost) == 0 {
-			return fmt.Errorf("FamilyCloudHost is empty")
+		if d.Addition.Type == MetaGroup || d.Addition.Type == MetaFamily {
+			if len(d.GroupCloudHost) == 0 {
+				return fmt.Errorf("GroupCloudHost is empty")
+			}
+			if len(d.FamilyCloudHost) == 0 {
+				return fmt.Errorf("FamilyCloudHost is empty")
+			}
 		}
 
 		d.cron = cron.NewCron(time.Hour * 12)
