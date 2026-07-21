@@ -883,6 +883,10 @@ func (d *Yun139) Put(ctx context.Context, dstDir model.Obj, stream model.FileStr
 		pathname := "/orchestration/personalCloud/uploadAndDownload/v1.0/pcUploadFileRequest"
 		if d.isFamily() || d.isGroup() {
 			uploadPath := d.dirPath(dstDir)
+			// 共享群的根目录上传路径为 0
+			if d.isGroup() && dstDir.GetID() == d.RootFolderID {
+				uploadPath = "0"
+			}
 			data = d.newJson(base.Json{
 				"fileCount":    1,
 				"manualRename": 2,
