@@ -32,6 +32,7 @@ type Yun139 struct {
 	PersonalCloudHost string
 	FamilyCloudHost   string
 	GroupCloudHost    string
+	ProviderRoot      string
 }
 
 func (d *Yun139) Config() driver.Config {
@@ -122,9 +123,10 @@ func (d *Yun139) Init(ctx context.Context) error {
 			return err
 		}
 	case MetaFamily:
-		if len(d.Addition.RootFolderID) == 0 {
-			// Attempt to obtain data.path as the root via a query and persist it.
-			if root, err := d.getFamilyRootPath(d.CloudID); err == nil && root != "" {
+		// Attempt to obtain data.path as the root via a query and persist it.
+		if root, err := d.getFamilyRootPath(d.CloudID); err == nil && root != "" {
+			d.ProviderRoot = root
+			if len(d.Addition.RootFolderID) == 0 {
 				d.RootFolderID = root
 				op.MustSaveDriverStorage(d)
 			}

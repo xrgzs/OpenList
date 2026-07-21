@@ -346,9 +346,9 @@ func (d *Yun139) familyGetFiles(catalogID string) ([]model.Obj, error) {
 			"sortDirection": 1,
 		})
 		// 传入 catalogID 是文件夹的ID，而不是完整路径
-		// 当传入catalogID为根目录时，不能使用 catalogID
-		if catalogID == d.RootFolderID {
-			delete(data, "catalogID")
+		// 当传入catalogID为家庭云根目录时，直接留空
+		if catalogID == d.ProviderRoot {
+			data["catalogID"] = ""
 		}
 		var resp QueryContentListResp
 		_, err := d.post("/orchestration/familyCloud-rebuild/content/v1.2/queryContentList", data, &resp)
