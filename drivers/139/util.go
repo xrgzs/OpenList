@@ -734,8 +734,12 @@ func (d *Yun139) uploadPersonalParts(ctx context.Context, partInfos []PartInfo, 
 			return getErr
 		}
 
+		// Save progress before this part so retries don't double-count bytes
+		partDoneStart := p.Done
 		err := retry.Do(
 			func() error {
+				// Reset progress to the start of this part on each attempt
+				p.Done = partDoneStart
 				if _, seekErr := rd.Seek(0, io.SeekStart); seekErr != nil {
 					return seekErr
 				}
