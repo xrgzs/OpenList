@@ -88,7 +88,7 @@ func (d *Yun139) Init(ctx context.Context) error {
 		if len(d.PersonalCloudHost) == 0 {
 			return fmt.Errorf("PersonalCloudHost is empty")
 		}
-		if d.Addition.Type == MetaGroup || d.Addition.Type == MetaFamily {
+		if d.isGroup() || d.isFamily() {
 			if len(d.GroupCloudHost) == 0 {
 				return fmt.Errorf("GroupCloudHost is empty")
 			}
