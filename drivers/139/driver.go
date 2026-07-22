@@ -124,14 +124,16 @@ func (d *Yun139) Init(ctx context.Context) error {
 		}
 	case MetaFamily:
 		// Attempt to obtain data.path as the root via a query and persist it.
-		if root, err := d.getFamilyRootPath(d.CloudID); err == nil && root != "" {
-			d.ProviderRoot = root
-			if len(d.Addition.RootFolderID) == 0 {
-				d.RootFolderID = root
-				op.MustSaveDriverStorage(d)
-			}
+		root, err := d.getFamilyRootPath(d.CloudID)
+		if err != nil || root == "" {
+			return fmt.Errorf("failed to get family root path: %w", err)
 		}
-		_, err := d.familyGetFiles(d.RootFolderID)
+		d.ProviderRoot = root
+		if len(d.Addition.RootFolderID) == 0 {
+			d.RootFolderID = root
+			op.MustSaveDriverStorage(d)
+		}
+		_, err = d.familyGetFiles(d.RootFolderID)
 		if err != nil {
 			return err
 		}
