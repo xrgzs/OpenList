@@ -148,7 +148,7 @@ func TestStreamSectionReader(t *testing.T) {
 	conf.AutoMemoryLimit = 0
 	conf.MaxBlockLimit = 2 << 10
 	partSize := 3 << 10
-	conf.Conf = &conf.Config{}
+	conf.Conf = &conf.Config{} // prefetch_chunks=0, legacy path
 	ss, err := stream.NewStreamSectionReader(f, partSize, nil)
 	if err != nil {
 		t.Errorf("NewStreamSectionReader() error = %v", err)
@@ -182,4 +182,176 @@ func TestStreamSectionReader(t *testing.T) {
 			})
 		}
 	}
+}
+
+func TestPrefetchDepth1(t *testing.T) {
+	buf := make([]byte, 16<<10) // 16KB
+	for i := range len(buf) {
+		buf[i] = byte(i % 256)
+	}
+	f := &stream.FileStream{
+		Obj: &model.Object{
+			Size: int64(len(buf)),
+		},
+		Reader: io.NopCloser(bytes.NewReader(buf)),
+	}
+	prevConf := conf.Conf
+	t.Cleanup(func() { conf.Conf = prevConf })
+	conf.Conf = &conf.Config{PrefetchChunks: 1}
+
+	partSize := 4 << 10 // 4KB
+	ss, err := stream.NewStreamSectionReader(f, partSize, nil)
+	if err != nil {
+		t.Fatalf("NewStreamSectionReader() error = %v", err)
+	}
+
+	for i := 0; i < len(buf); i += partSize {
+		length := partSize
+		if i+length > len(buf) {
+			length = len(buf) - i
+		}
+		rs, err := ss.GetSectionReader(int64(i), int64(length))
+		if err != nil {
+			t.Fatalf("GetSectionReader(%d) error = %v", i, err)
+		}
+		b1, err := io.ReadAll(rs)
+		if err != nil {
+			t.Fatalf("ReadAll(%d) error = %v", i, err)
+		}
+		if !bytes.Equal(buf[i:i+length], b1) {
+			t.Fatalf("chunk %d: got %x, want %x", i/partSize, b1, buf[i:i+length])
+		}
+		ss.FreeSectionReader(rs)
+	}
+}
+
+func TestPrefetchDepth3(t *testing.T) {
+	buf := make([]byte, 32<<10) // 32KB
+	for i := range len(buf) {
+		buf[i] = byte(i % 256)
+	}
+	f := &stream.FileStream{
+		Obj: &model.Object{
+			Size: int64(len(buf)),
+		},
+		Reader: io.NopCloser(bytes.NewReader(buf)),
+	}
+	prevConf := conf.Conf
+	t.Cleanup(func() { conf.Conf = prevConf })
+	conf.Conf = &conf.Config{PrefetchChunks: 3}
+
+	partSize := 4 << 10 // 4KB
+	ss, err := stream.NewStreamSectionReader(f, partSize, nil)
+	if err != nil {
+		t.Fatalf("NewStreamSectionReader() error = %v", err)
+	}
+
+	for i := 0; i < len(buf); i += partSize {
+		length := partSize
+		if i+length > len(buf) {
+			length = len(buf) - i
+		}
+		rs, err := ss.GetSectionReader(int64(i), int64(length))
+		if err != nil {
+			t.Fatalf("GetSectionReader(%d) error = %v", i, err)
+		}
+		b1, err := io.ReadAll(rs)
+		if err != nil {
+			t.Fatalf("ReadAll(%d) error = %v", i, err)
+		}
+		if !bytes.Equal(buf[i:i+length], b1) {
+			t.Fatalf("chunk %d: got %x, want %x", i/partSize, b1, buf[i:i+length])
+		}
+		ss.FreeSectionReader(rs)
+	}
+}
+
+func TestPrefetchSingleChunkFile(t *testing.T) {
+	// 文件小于一个分片，不应启动预读
+	buf := []byte("small file content")
+	f := &stream.FileStream{
+		Obj: &model.Object{
+			Size: int64(len(buf)),
+		},
+		Reader: io.NopCloser(bytes.NewReader(buf)),
+	}
+	prevConf := conf.Conf
+	t.Cleanup(func() { conf.Conf = prevConf })
+	conf.Conf = &conf.Config{PrefetchChunks: 3}
+
+	ss, err := stream.NewStreamSectionReader(f, len(buf)*2, nil)
+	if err != nil {
+		t.Fatalf("NewStreamSectionReader() error = %v", err)
+	}
+
+	rs, err := ss.GetSectionReader(0, int64(len(buf)))
+	if err != nil {
+		t.Fatalf("GetSectionReader() error = %v", err)
+	}
+	b1, err := io.ReadAll(rs)
+	if err != nil {
+		t.Fatalf("ReadAll() error = %v", err)
+	}
+	if !bytes.Equal(buf, b1) {
+		t.Fatalf("got %x, want %x", b1, buf)
+	}
+	ss.FreeSectionReader(rs)
+}
+
+func TestPrefetchDiscardSection(t *testing.T) {
+	buf := make([]byte, 16<<10)
+	for i := range len(buf) {
+		buf[i] = byte(i % 256)
+	}
+	f := &stream.FileStream{
+		Obj: &model.Object{
+			Size: int64(len(buf)),
+		},
+		Reader: io.NopCloser(bytes.NewReader(buf)),
+	}
+	prevConf := conf.Conf
+	t.Cleanup(func() { conf.Conf = prevConf })
+	conf.Conf = &conf.Config{PrefetchChunks: 1}
+
+	partSize := 4 << 10
+	ss, err := stream.NewStreamSectionReader(f, partSize, nil)
+	if err != nil {
+		t.Fatalf("NewStreamSectionReader() error = %v", err)
+	}
+
+	// 跳过前 8KB（2个分片）
+	err = ss.DiscardSection(0, int64(partSize)*2)
+	if err != nil {
+		t.Fatalf("DiscardSection() error = %v", err)
+	}
+
+	// 读取第3个分片
+	rs, err := ss.GetSectionReader(int64(partSize)*2, int64(partSize))
+	if err != nil {
+		t.Fatalf("GetSectionReader() error = %v", err)
+	}
+	b1, err := io.ReadAll(rs)
+	if err != nil {
+		t.Fatalf("ReadAll() error = %v", err)
+	}
+	want := buf[partSize*2 : partSize*3]
+	if !bytes.Equal(want, b1) {
+		t.Fatalf("got %x, want %x", b1, want)
+	}
+	ss.FreeSectionReader(rs)
+
+	// 再读第4个分片
+	rs, err = ss.GetSectionReader(int64(partSize)*3, int64(partSize))
+	if err != nil {
+		t.Fatalf("GetSectionReader() error = %v", err)
+	}
+	b1, err = io.ReadAll(rs)
+	if err != nil {
+		t.Fatalf("ReadAll() error = %v", err)
+	}
+	want = buf[partSize*3 : partSize*4]
+	if !bytes.Equal(want, b1) {
+		t.Fatalf("got %x, want %x", b1, want)
+	}
+	ss.FreeSectionReader(rs)
 }

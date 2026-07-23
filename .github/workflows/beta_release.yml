@@ -22,6 +22,17 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Resolve previous beta tag
+        run: |
+          set -e
+          PREV_BETA_SHA=$(git ls-remote --tags origin refs/tags/beta | awk '{print $1}')
+          echo "PREV_BETA_SHA=$PREV_BETA_SHA" >> $GITHUB_ENV
+          if [ -n "$PREV_BETA_SHA" ]; then
+            echo "Found previous beta tag at: $PREV_BETA_SHA"
+          else
+            echo "No previous beta tag found"
+          fi
+
       - name: Create or update ref
         id: create-or-update-ref
         uses: ovsds/create-or-update-ref-action@v1
@@ -29,15 +40,37 @@ jobs:
           ref: tags/beta
           sha: ${{ github.sha }}
 
-      - name: Delete beta tag
-        run: git tag -d beta
-        continue-on-error: true
-
-      - name: changelog # or changelogithub@0.12 if ensure the stable result
+      - name: Generate changelog from previous beta
         id: changelog
         run: |
-          git tag -l
-          npx changelogithub --output CHANGELOG.md
+          set -e
+          changes_file=.changes.tmp
+          range=""
+
+          if [ -n "$PREV_BETA_SHA" ]; then
+            range="$PREV_BETA_SHA..$GITHUB_SHA"
+            git log --no-merges --pretty="- %s (%h)" "$range" > "$changes_file" || true
+          else
+            git log --no-merges -n 30 --pretty="- %s (%h)" > "$changes_file" || true
+          fi
+
+          {
+            echo "# Beta Changelog"
+            echo
+            if [ -n "$range" ]; then
+              echo "Range: $range"
+            else
+              echo "Range: latest 30 commits (no previous beta tag)"
+            fi
+            echo
+            if [ -s "$changes_file" ]; then
+              cat "$changes_file"
+            else
+              echo "- No user-facing changes in this range"
+            fi
+          } > CHANGELOG.md
+
+          rm -f "$changes_file"
 
       - name: Upload assets to beta release
         env:
@@ -62,24 +95,36 @@ jobs:
     needs:
       - changelog
     strategy:
+      fail-fast: false
       matrix:
         include:
-          - target: "!(*musl*|*windows-arm64*|*windows7-*|*android*|*freebsd*)" # xgo and loongarch (exclude mips64le)
-            hash: "md5"
+          - target: "linux-amd64" # xgo linux-amd64
+            hash: "md5-linux-amd64"
             flags: ""
             goflags: ""
-          - target: "linux-(mips|mips64|mipsle|mips64le|loong64)-musl*" # musl-compat-family
-            hash: "md5-linux-musl-mips"
+          - target: "linux-arm64" # xgo linux-arm64
+            hash: "md5-linux-arm64"
+            flags: ""
+            goflags: ""
+          - target: "darwin-amd64" # xgo darwin-amd64
+            hash: "md5-darwin-amd64"
+            flags: ""
+            goflags: ""
+          - target: "darwin-arm64" # xgo darwin-arm64
+            hash: "md5-darwin-arm64"
+            flags: ""
+            goflags: ""
+          - target: "windows-amd64" # xgo windows-amd64
+            hash: "md5-windows-amd64"
+            flags: ""
+            goflags: ""
+          - target: "linux-amd64-musl" # musl linux-amd64
+            hash: "md5-linux-musl-amd64"
             flags: "-ldflags=-linkmode external -extldflags '-static -fpic'"
             goflags: ""
             musl_static: "true"
-          - target: "linux-!(arm*|mips|mips64|mipsle|mips64le|loong64)-musl*" # musl-not-arm (exclude compat-family)
-            hash: "md5-linux-musl"
-            flags: "-ldflags=-linkmode external -extldflags '-static -fpic'"
-            goflags: ""
-            musl_static: "true"
-          - target: "linux-arm*-musl*" #musl-arm
-            hash: "md5-linux-musl-arm"
+          - target: "linux-arm64-musl" # musl linux-arm64
+            hash: "md5-linux-musl-arm64"
             flags: "-ldflags=-linkmode external -extldflags '-static -fpic'"
             goflags: ""
             musl_static: "true"
@@ -95,11 +140,6 @@ jobs:
             musl_static: "false"
           - target: "android-*" #android
             hash: "md5-android"
-            flags: ""
-            goflags: ""
-            musl_static: "false"
-          - target: "freebsd-*" #freebsd
-            hash: "md5-freebsd"
             flags: ""
             goflags: ""
             musl_static: "false"
@@ -136,7 +176,7 @@ jobs:
           musl-base-url: "https://github.com/OpenListTeam/musl-compilers/releases/latest/download/"
           x-flags: |
             github.com/OpenListTeam/OpenList/v4/internal/conf.BuiltAt=$built_at
-            github.com/OpenListTeam/OpenList/v4/internal/conf.GitAuthor=The OpenList Projects Contributors <noreply@openlist.team>
+            github.com/OpenListTeam/OpenList/v4/internal/conf.GitAuthor=Xiaraon Studio <noreply@xrgzs.top>
             github.com/OpenListTeam/OpenList/v4/internal/conf.GitCommit=$git_commit
             github.com/OpenListTeam/OpenList/v4/internal/conf.Version=$tag
             github.com/OpenListTeam/OpenList/v4/internal/conf.WebVersion=rolling
