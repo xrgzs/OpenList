@@ -211,14 +211,13 @@ func (d *BaiduShare) Link(ctx context.Context, file model.Obj, args model.LinkAr
 	if len(transferJson.Extra.List) == 0 {
 		return nil, fmt.Errorf("transfer response missing Extra.List")
 	}
-	obj, ok := file.(*model.Object)
-	if !ok {
-		return nil, fmt.Errorf("file is not *model.Object")
+	// 新建对象，不修改原 file 对象，避免污染 dirCache
+	newObj := &model.Object{
+		ID:   fmt.Sprint(transferJson.Extra.List[0].ToFsID),
+		Path: transferJson.Extra.List[0].To,
 	}
-	obj.ID = fmt.Sprint(transferJson.Extra.List[0].ToFsID)
-	obj.Path = transferJson.Extra.List[0].To
-	defer d.ref.Remove(ctx, obj) // 转存后删除，避免占用空间
-	return d.ref.Link(ctx, obj, args)
+	defer d.ref.Remove(ctx, newObj) // 转存后删除，避免占用空间
+	return d.ref.Link(ctx, newObj, args)
 }
 
 func (d *BaiduShare) MakeDir(ctx context.Context, parentDir model.Obj, dirName string) error {
