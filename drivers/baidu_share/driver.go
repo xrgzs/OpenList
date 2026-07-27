@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"net/url"
 	"path"
 	"time"
 
@@ -54,8 +53,7 @@ func (d *BaiduShare) Init(ctx context.Context) error {
 		SetBaseURL("https://pan.baidu.com").
 		SetHeader("User-Agent", "netdisk").
 		SetHeader("Referer", "https://pan.baidu.com").
-		SetCookie(&http.Cookie{Name: "BDUSS", Value: d.ref.Addition.BDUSS}).
-		SetCookie(&http.Cookie{Name: "ndut_fmt"})
+		SetCookie(&http.Cookie{Name: "BDUSS", Value: d.ref.Addition.BDUSS})
 	respJson := struct {
 		Errno int64 `json:"errno"`
 		Data  struct {
@@ -68,11 +66,11 @@ func (d *BaiduShare) Init(ctx context.Context) error {
 		} `json:"data"`
 	}{}
 	resp, err := d.client.R().
-		SetBody(url.Values{
-			"pwd":      {d.Pwd},
-			"root":     {"1"},
-			"shorturl": {d.Surl},
-		}.Encode()).
+		SetFormData(map[string]string{
+			"pwd":      d.Pwd,
+			"root":     "1",
+			"shorturl": d.Surl,
+		}).
 		SetResult(&respJson).
 		Post("share/wxlist?channel=weixin&version=2.2.2&clienttype=25&web=1")
 	if err == nil {
@@ -122,15 +120,15 @@ func (d *BaiduShare) List(ctx context.Context, dir model.Obj, args model.ListArg
 			} `json:"data"`
 		}{}
 		resp, e := d.client.R().
-			SetBody(url.Values{
-				"dir":      {reqDir},
-				"num":      {"1000"},
-				"order":    {"time"},
-				"page":     {fmt.Sprint(page)},
-				"pwd":      {d.Pwd},
-				"root":     {isRoot},
-				"shorturl": {d.Surl},
-			}.Encode()).
+			SetFormData(map[string]string{
+				"dir":      reqDir,
+				"num":      "1000",
+				"order":    "time",
+				"page":     fmt.Sprint(page),
+				"pwd":      d.Pwd,
+				"root":     isRoot,
+				"shorturl": d.Surl,
+			}).
 			SetResult(&respJson).
 			Post("share/wxlist?channel=weixin&version=2.2.2&clienttype=25&web=1")
 		err = e
@@ -190,7 +188,7 @@ func (d *BaiduShare) Link(ctx context.Context, file model.Obj, args model.LinkAr
 			"from":       d.info.Uk,
 			"sekey":      d.info.Seckey,
 			"ondup":      "newcopy",
-			"async":      "1",
+			"async":      "0",
 			"channel":    "chunlei",
 			"web":        "1",
 			"app_id":     "250528",
