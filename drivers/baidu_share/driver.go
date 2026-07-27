@@ -11,7 +11,6 @@ import (
 	"github.com/OpenListTeam/OpenList/v4/drivers/baidu_netdisk"
 	"github.com/OpenListTeam/OpenList/v4/drivers/base"
 	"github.com/OpenListTeam/OpenList/v4/internal/driver"
-	"github.com/OpenListTeam/OpenList/v4/internal/errs"
 	"github.com/OpenListTeam/OpenList/v4/internal/model"
 	"github.com/go-resty/resty/v2"
 )
@@ -218,36 +217,6 @@ func (d *BaiduShare) Link(ctx context.Context, file model.Obj, args model.LinkAr
 	}
 	defer d.ref.Remove(ctx, newObj) // 转存后删除，避免占用空间
 	return d.ref.Link(ctx, newObj, args)
-}
-
-func (d *BaiduShare) MakeDir(ctx context.Context, parentDir model.Obj, dirName string) error {
-	// TODO create folder, optional
-	return errs.NotSupport
-}
-
-func (d *BaiduShare) Move(ctx context.Context, srcObj, dstDir model.Obj) error {
-	// TODO move obj, optional
-	return errs.NotSupport
-}
-
-func (d *BaiduShare) Rename(ctx context.Context, srcObj model.Obj, newName string) error {
-	// TODO rename obj, optional
-	return errs.NotSupport
-}
-
-func (d *BaiduShare) Copy(ctx context.Context, srcObj, dstDir model.Obj) error {
-	// TODO copy obj, optional
-	return errs.NotSupport
-}
-
-func (d *BaiduShare) Remove(ctx context.Context, obj model.Obj) error {
-	// TODO remove obj, optional
-	return errs.NotSupport
-}
-
-func (d *BaiduShare) Put(ctx context.Context, dstDir model.Obj, stream model.FileStreamer, up driver.UpdateProgress) error {
-	// TODO upload file, optional
-	return errs.NotSupport
 }
 
 var _ driver.Driver = (*BaiduShare)(nil)
