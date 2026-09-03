@@ -902,6 +902,7 @@ func (d *Yun139) newRequest(url string, method string, callback base.ReqCallback
 		"X-Yun-Client-Info":    "||9|7.14.0|chrome|120.0.0.0|||windows 10||zh-CN|||dW5kZWZpbmVk||",
 		"X-Yun-Module-Type":    "100",
 		"X-Yun-Svc-Type":       "1",
+		"X-Yun-Url-Type":       "3",
 	})
 
 	var e BaseResp
