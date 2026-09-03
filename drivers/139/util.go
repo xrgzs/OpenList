@@ -213,6 +213,7 @@ func (d *Yun139) request(url string, method string, callback base.ReqCallback, r
 		"x-m4c-src":              "10002",
 		"x-SvcType":              svcType,
 		"Inner-Hcy-Router-Https": "1",
+		"X-Yun-Url-Type":         "3",
 	})
 
 	var e BaseResp
