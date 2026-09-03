@@ -182,10 +182,10 @@ func (d *Yun139) request(url string, method string, callback base.ReqCallback, r
 		//"mcloud-route": "001",
 		"mcloud-sign": fmt.Sprintf("%s,%s,%s", ts, randStr, sign),
 		//"mcloud-skey":"",
-		"mcloud-version":         "7.14.0",
+		"mcloud-version":         "7.18.0",
 		"Origin":                 "https://yun.139.com",
 		"Referer":                "https://yun.139.com/w/",
-		"x-DeviceInfo":           "||9|7.14.0|chrome|120.0.0.0|||windows 10||zh-CN|||",
+		"x-DeviceInfo":           "||9|7.18.0|chrome|120.0.0.0|||windows 10||zh-CN|||",
 		"x-huawei-channelSrc":    "10000034",
 		"x-inner-ntwk":           "2",
 		"x-m4c-caller":           "PC",
@@ -257,10 +257,10 @@ func (d *Yun139) requestRoute(data interface{}, resp interface{}) ([]byte, error
 		//"mcloud-route": "001",
 		"mcloud-sign": fmt.Sprintf("%s,%s,%s", ts, randStr, sign),
 		//"mcloud-skey":"",
-		"mcloud-version":         "7.14.0",
+		"mcloud-version":         "7.18.0",
 		"Origin":                 "https://yun.139.com",
 		"Referer":                "https://yun.139.com/w/",
-		"x-DeviceInfo":           "||9|7.14.0|chrome|120.0.0.0|||windows 10||zh-CN|||",
+		"x-DeviceInfo":           "||9|7.18.0|chrome|120.0.0.0|||windows 10||zh-CN|||",
 		"x-huawei-channelSrc":    "10000034",
 		"x-inner-ntwk":           "2",
 		"x-m4c-caller":           "PC",
@@ -858,7 +858,7 @@ func (d *Yun139) yunClientInfo() string {
 	if d.ClientType == "pc" {
 		clientType = yunClientTypePC
 	}
-	return "||" + clientType + "|7.14.0|chrome|120.0.0.0|||windows 10||zh-CN|||dW5kZWZpbmVk||"
+	return "||" + clientType + "|7.18.0|chrome|120.0.0.0|||windows 10||zh-CN|||dW5kZWZpbmVk||"
 }
 
 func (d *Yun139) newRequest(url string, method string, callback base.ReqCallback, resp interface{}) ([]byte, error) {
@@ -886,8 +886,8 @@ func (d *Yun139) newRequest(url string, method string, callback base.ReqCallback
 		"Mcloud-Client":        "10701",
 		"Mcloud-Route":         "001",
 		"Mcloud-Sign":          fmt.Sprintf("%s,%s,%s", ts, randStr, sign),
-		"Mcloud-Version":       "7.14.0",
-		"x-DeviceInfo":         "||9|7.14.0|chrome|120.0.0.0|||windows 10||zh-CN|||",
+		"Mcloud-Version":       "7.18.0",
+		"x-DeviceInfo":         "||9|7.18.0|chrome|120.0.0.0|||windows 10||zh-CN|||",
 		"x-huawei-channelSrc":  "10000034",
 		"x-inner-ntwk":         "2",
 		"x-m4c-caller":         "PC",
