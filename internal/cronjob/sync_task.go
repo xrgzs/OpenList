@@ -157,6 +157,11 @@ func (t *SyncTask) syncDir(ctx context.Context, filters *syncFilters, srcPath, d
 			continue
 		}
 		extraPath := stdpath.Join(dstPath, name)
+		// 排除规则同样作用于目标端多余对象。
+		// 例如管理员用 *.log 排除日志时，目标端不存在于源端的日志文件不应被 sync 删除。
+		if filters.excluded(relativePath(t.Args.Dst, extraPath)) {
+			continue
+		}
 		t.Status = fmt.Sprintf("deleting extra object %s", extraPath)
 		if err := fs.Remove(ctx, extraPath); err != nil {
 			// 单个多余对象删除失败不阻塞其他同步项，但最终任务要标记失败。
@@ -181,8 +186,9 @@ func (t *SyncTask) syncDir(ctx context.Context, filters *syncFilters, srcPath, d
 
 		if srcObj.IsDir() {
 			nextDepth := depth + 1
-			// MaxDepth=1 表示最多处理第一层；进入子目录后的深度会变成 2。
-			if t.Args.MaxDepth > 0 && nextDepth > t.Args.MaxDepth {
+			// MaxDepth 的计数方式和 rclone 一致：同步根目录是第 0 层。
+			// MaxDepth=1 时不进入子目录；MaxDepth=2 只进入第一层子目录。
+			if t.Args.MaxDepth > 0 && nextDepth >= t.Args.MaxDepth {
 				continue
 			}
 			if err := fs.MakeDir(ctx, childDstPath); err != nil {
@@ -440,7 +446,11 @@ func RegisterSyncHandler() {
 				if err := json.Unmarshal(raw, &args); err != nil {
 					return fmt.Errorf("invalid sync args: %w", err)
 				}
-				return validateSyncArgs(args)
+				if err := validateSyncArgs(args); err != nil {
+					return err
+				}
+				// 创建/编辑时也要检查路径互套；不能等到定时触发时才暴露配置错误。
+				return validateSyncPaths(args)
 			},
 			RunFunc: runSync,
 		},
