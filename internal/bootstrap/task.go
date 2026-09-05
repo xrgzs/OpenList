@@ -2,12 +2,14 @@ package bootstrap
 
 import (
 	"github.com/OpenListTeam/OpenList/v4/internal/conf"
+	"github.com/OpenListTeam/OpenList/v4/internal/cronjob"
 	"github.com/OpenListTeam/OpenList/v4/internal/db"
 	"github.com/OpenListTeam/OpenList/v4/internal/fs"
 	"github.com/OpenListTeam/OpenList/v4/internal/offline_download/tool"
 	"github.com/OpenListTeam/OpenList/v4/internal/op"
 	"github.com/OpenListTeam/OpenList/v4/internal/setting"
 	"github.com/OpenListTeam/tache"
+	log "github.com/sirupsen/logrus"
 )
 
 func taskFilterNegative(num int) int64 {
@@ -49,4 +51,14 @@ func InitTaskManager() {
 	op.RegisterSettingChangingCallback(func() {
 		fs.ArchiveContentUploadTaskManager.SetWorkersNumActive(taskFilterNegative(setting.GetInt(conf.TaskDecompressUploadThreadsNum, conf.Conf.Tasks.DecompressUpload.Workers)))
 	})
+	// 先注册内置计划任务类型，再启动调度器；这样创建 API 和恢复任务都能找到 Handler。
+	// 后续定时复制、定时删除、定时重载存储等只需要在这里继续注册 Handler。
+	cronjob.RegisterSyncHandler()
+
+	// 计划任务依赖任务管理器（例如同步要向 CopyTaskManager 提交子任务），
+	// 因此放在所有基础任务管理器创建完成后启动。
+	if err := cronjob.InitCronJobScheduler(); err != nil {
+		// 当前启动流程没有返回值，这里用 Fatal 明确暴露调度器初始化失败。
+		log.Fatalf("failed initialize cronjob scheduler: %s", err.Error())
+	}
 }
