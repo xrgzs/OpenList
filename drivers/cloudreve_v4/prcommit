@@ -1,0 +1,80 @@
+fix(cloudreve_v4): refresh expired signed file urls and simplify cache helpers
+
+
+## Summary / 摘要
+
+This PR improves signed file URL handling in the `cloudreve_v4` driver and simplifies several local helper layers introduced in the current changeset.
+
+- Parse expiration directly from object-storage signed URLs when available, instead of relying only on Cloudreve's API `expires` field.
+- Refresh signed URLs with a `no_cache` request when the cached URL is already expired or too close to expiration.
+- Keep returned link expiration aligned with the actual signed URL lifetime to reduce expired direct-link responses.
+- Inline single-use file URL request logic back into `Link`.
+- Merge single-purpose cache decision wrappers to reduce helper indirection while keeping provider-specific signed URL parsers separate for readability.
+
+- [ ] This PR has breaking changes.
+      / 此 PR 包含破坏性变更。
+- [ ] This PR changes public API, config, storage format, or migration behavior.
+      / 此 PR 修改了公开 API、配置、存储格式或迁移行为。
+- [ ] This PR requires corresponding changes in related repositories.
+      / 此 PR 需要关联仓库同步修改。
+
+Related repository PRs / 关联仓库 PR:
+
+- OpenList-Frontend:
+- OpenList-Docs:
+
+## Related Issues / 关联 Issue
+
+<!--
+Use `Closes #123`, `Fixes #123`, or `Relates to #123`.
+Remove this section if not applicable.
+使用 `Closes #123`、`Fixes #123` 或 `Relates to #123`。
+不适用时请删除本节。
+-->
+
+## Testing / 测试
+
+- [ ] `go test ./...`
+- [x] `go test ./drivers/cloudreve_v4/...`
+- [ ] Manual test / 手动测试:
+
+## Checklist / 检查清单
+
+- [ ] I have read [CONTRIBUTING](https://github.com/OpenListTeam/OpenList/blob/main/CONTRIBUTING.md).
+      / 我已阅读 [CONTRIBUTING](https://github.com/OpenListTeam/OpenList/blob/main/CONTRIBUTING.md)。
+- [ ] I confirm this contribution follows the repository license, contribution policy, and code of conduct.
+      / 我确认此贡献符合仓库许可证、贡献规范和行为准则。
+- [x] I have formatted the changed code with `gofmt`, `go fmt`, or `prettier` where applicable.
+      / 我已按适用情况使用 `gofmt`、`go fmt` 或 `prettier` 格式化变更代码。
+- [ ] I have requested review from relevant maintainers or code owners where applicable.
+      / 我已在适用情况下请求相关维护者或代码所有者审查。
+
+## AI Disclosure / AI 使用声明
+
+- [x] This PR includes AI-assisted content.
+      / 此 PR 包含 AI 辅助内容。
+
+Tools used / 使用工具:
+
+- [ ] ChatGPT
+- [x] Codex
+- [ ] GitHub Copilot
+- [ ] Claude
+- [ ] Gemini
+- [ ] Other (please specify) / 其他（请注明）:
+
+Usage scope / 使用范围:
+
+- [x] Code generation / 代码生成
+- [x] Refactoring / 重构
+- [ ] Documentation / 文档
+- [ ] Tests / 测试
+- [ ] Translation / 翻译
+- [x] Review assistance / 审查辅助
+
+- [x] I have reviewed and validated all AI-assisted content included in this PR.
+      / 我已审核并验证此 PR 中的所有 AI 辅助内容。
+- [ ] I have ensured that all AI-assisted commits include `Co-Authored-By` attribution.
+      / 我已确保所有 AI 辅助提交都包含 `Co-Authored-By` 归属信息。
+- [x] I can reproduce all AI-assisted content included in this PR without any AI tools.
+      / 我可以在没有任何 AI 工具的情况下重现此 PR 中包含的所有 AI 辅助内容。

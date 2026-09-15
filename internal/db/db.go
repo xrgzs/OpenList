@@ -12,10 +12,11 @@ var db *gorm.DB
 
 func Init(d *gorm.DB) {
 	db = d
-	err := AutoMigrate(new(model.Storage), new(model.User), new(model.Meta), new(model.SettingItem), new(model.SearchNode), new(model.TaskItem), new(model.SSHPublicKey), new(model.SharingDB))
+	err := AutoMigrate(new(model.Storage), new(model.User), new(model.Meta), new(model.SettingItem), new(model.SearchNode), new(model.TaskItem), new(model.SSHPublicKey), new(model.SharingDB), new(model.CronJob))
 	if err != nil {
 		log.Fatalf("failed migrate database: %s", err.Error())
 	}
+	initIPDB()
 }
 
 func AutoMigrate(dst ...interface{}) error {
@@ -42,6 +43,6 @@ func Close() {
 	err = sqlDB.Close()
 	if err != nil {
 		log.Errorf("failed to close db: %s", err.Error())
-		return
 	}
+	closeIPDB()
 }

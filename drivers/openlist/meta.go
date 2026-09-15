@@ -16,6 +16,7 @@ type Addition struct {
 	PassUAToUpsteam          bool   `json:"pass_ua_to_upsteam" default:"true"`
 	ForwardArchiveReq        bool   `json:"forward_archive_requests" default:"true"`
 	PassRefreshFlagToUpsteam bool   `json:"pass_refresh_flag_to_upsteam" default:"false"`
+	Cdn                      string `json:"cdn" default:""`
 }
 
 var config = driver.Config{

@@ -26,6 +26,9 @@ type Addition struct {
 	CustomUploadPartSize  int64  `json:"custom_upload_part_size" type:"number" default:"0" help:"0 for auto"`
 	LowBandwithUploadMode bool   `json:"low_bandwith_upload_mode" default:"false"`
 	OnlyListVideoFile     bool   `json:"only_list_video_file" default:"false"`
+	UseInsecureRedirect   bool   `json:"use_insecure_redirect" help:"Support 302, but leak token"`
+	BDUSS                 string `json:"BDUSS" help:"for baidu share"`
+	TransferPath          string `json:"trasfer_path" default:"/" help:"for baidu share"`
 }
 
 const (
@@ -38,9 +41,10 @@ const (
 )
 
 var config = driver.Config{
-	Name:        "BaiduNetdisk",
-	DefaultRoot: "/",
-	PreferProxy: true,
+	Name:          "BaiduNetdisk",
+	DefaultRoot:   "/",
+	PreferProxy:   true,
+	LinkCacheMode: driver.LinkCacheIP | driver.LinkCacheUA,
 }
 
 func init() {

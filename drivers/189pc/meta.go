@@ -23,6 +23,7 @@ type Addition struct {
 	RapidUpload     bool   `json:"rapid_upload"`
 	NoUseOcr        bool   `json:"no_use_ocr"`
 	GenerateTorrent bool   `json:"generate_torrent" help:"Generate torrent file with CAS extension after upload"`
+	OnlyRapid       bool   `json:"only_rapid" default:"false"`
 }
 
 var config = driver.Config{

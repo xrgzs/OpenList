@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/OpenListTeam/OpenList/v4/internal/conf"
+	"github.com/OpenListTeam/OpenList/v4/internal/cronjob"
 	"github.com/OpenListTeam/OpenList/v4/internal/model"
 	"github.com/OpenListTeam/OpenList/v4/internal/task"
 
@@ -225,4 +226,6 @@ func SetupTaskRoute(g *gin.RouterGroup) {
 	taskRoute(g.Group("/offline_download_transfer"), tool.TransferTaskManager)
 	taskRoute(g.Group("/decompress"), fs.ArchiveDownloadTaskManager)
 	taskRoute(g.Group("/decompress_upload"), fs.ArchiveContentUploadTaskManager)
+	// cron_sync 是同步编排任务的持久化 key；管理员可像普通复制任务一样查询、取消、重试。
+	taskRoute(g.Group("/cron_sync"), cronjob.SyncTaskManager)
 }
