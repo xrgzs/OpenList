@@ -10,11 +10,11 @@ on:
       package:
         description: 'The name of the package to clean up'
         required: true
-        default: 'openlist-git'
+        default: 'openlist'
       owner:
         description: 'The owner of the package (user or organization)'
         required: false
-        default: 'openlistteam'
+        default: 'xrgzs'
       older_than:
         description: 'Delete untagged images older than this many days'
         required: false
@@ -41,11 +41,11 @@ jobs:
         id: setup
         shell: bash
         run: |
-          PACKAGE="${{ github.event.inputs.package || 'openlist-git' }}"
+          PACKAGE="${{ github.event.inputs.package || 'openlist' }}"
           OLDER="${{ github.event.inputs.older_than || '-1' }}"
           TOLERANCE_VAL="${{ github.event.inputs.untagged_timestamp_tolerance || '10000' }}"
           TOKEN_INPUT="${{ github.event.inputs.token || '' }}"
-          OWNER="${{ github.event.inputs.owner || 'openlistteam' }}"
+          OWNER="${{ github.event.inputs.owner || 'xrgzs' }}"
 
           echo "package_name=$PACKAGE" >> "$GITHUB_OUTPUT"
           echo "older_than=$OLDER" >> "$GITHUB_OUTPUT"

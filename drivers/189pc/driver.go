@@ -375,7 +375,14 @@ func (y *Cloud189PC) Put(ctx context.Context, dstDir model.Obj, stream model.Fil
 		// 尝试妙传
 		if newObj, err := y.RapidUpload(ctx, dstDir, stream, isFamily, overwrite); err == nil {
 			return newObj, nil
+		} else {
+			fmt.Println("[189] RapidUpload old failed")
+			if y.Addition.OnlyRapid && y.Addition.UploadMethod != "rapid" {
+				// 仅允许秒传，秒传失败则直接返回错误，不进行后续上传
+				return nil, err
+			}
 		}
+
 	}
 
 	uploadMethod := y.UploadMethod

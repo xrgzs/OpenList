@@ -21,7 +21,6 @@ import (
 	"github.com/OpenListTeam/OpenList/v4/pkg/cron"
 	"github.com/OpenListTeam/OpenList/v4/pkg/utils"
 	"github.com/go-resty/resty/v2"
-	"google.golang.org/appengine/log"
 )
 
 type ChaoXing struct {
@@ -41,6 +40,9 @@ func (d *ChaoXing) GetAddition() driver.Additional {
 }
 
 func (d *ChaoXing) refreshCookie() error {
+	if d.Addition.UserName == "" || d.Addition.Password == "" {
+		return nil
+	}
 	cookie, err := d.Login()
 	if err != nil {
 		d.Status = err.Error()
@@ -55,13 +57,13 @@ func (d *ChaoXing) refreshCookie() error {
 func (d *ChaoXing) Init(ctx context.Context) error {
 	err := d.refreshCookie()
 	if err != nil {
-		log.Errorf(ctx, err.Error())
+		utils.Log.Error(err)
 	}
 	d.cron = cron.NewCron(time.Hour * 12)
 	d.cron.Do(func() {
 		err = d.refreshCookie()
 		if err != nil {
-			log.Errorf(ctx, err.Error())
+			utils.Log.Error(err)
 		}
 	})
 	return nil
@@ -85,20 +87,31 @@ func (d *ChaoXing) List(ctx context.Context, dir model.Obj, args model.ListArgs)
 }
 
 func (d *ChaoXing) Link(ctx context.Context, file model.Obj, args model.LinkArgs) (*model.Link, error) {
+	if args.Redirect {
+		return &model.Link{
+			URL: fmt.Sprintf("https://sharewh.xuexi365.com/share/download/%s", file.GetID()),
+		}, nil
+	}
 	var resp DownResp
 	ua := d.conf.ua
-	fileId := strings.Split(file.GetID(), "$")[1]
-	_, err := d.requestDownload("/screen/note_note/files/status/"+fileId, http.MethodPost, func(req *resty.Request) {
-		req.SetHeader("User-Agent", ua)
+	_, err := d.requestDownload("/proxy/apis/common/fileStatus", http.MethodGet, func(req *resty.Request) {
+		req.SetHeader("User-Agent", ua).
+			SetQueryParams(map[string]string{
+				"crossOrigin": "true",
+				"objectId":    file.GetID(),
+			}).
+			ForceContentType("application/json")
 	}, &resp)
 	if err != nil {
 		return nil, err
 	}
-	u := resp.Download
+	u := resp.Data.Download
+	if u == "" {
+		return nil, fmt.Errorf("empty link")
+	}
 	return &model.Link{
 		URL: u,
 		Header: http.Header{
-			"Cookie":     []string{d.Cookie},
 			"Referer":    []string{d.conf.referer},
 			"User-Agent": []string{ua},
 		},
