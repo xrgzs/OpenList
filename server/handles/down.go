@@ -2,7 +2,9 @@ package handles
 
 import (
 	"errors"
+	"fmt"
 	stdpath "path"
+	"time"
 
 	"github.com/OpenListTeam/OpenList/v4/internal/conf"
 	"github.com/OpenListTeam/OpenList/v4/internal/driver"
@@ -10,6 +12,7 @@ import (
 	"github.com/OpenListTeam/OpenList/v4/internal/fs"
 	"github.com/OpenListTeam/OpenList/v4/internal/model"
 	"github.com/OpenListTeam/OpenList/v4/internal/net"
+	"github.com/OpenListTeam/OpenList/v4/internal/op"
 	"github.com/OpenListTeam/OpenList/v4/internal/setting"
 	"github.com/OpenListTeam/OpenList/v4/pkg/utils"
 	"github.com/OpenListTeam/OpenList/v4/server/common"
@@ -36,7 +39,11 @@ func Down(c *gin.Context) {
 			Redirect: true,
 		})
 		if err != nil {
-			common.ErrorPage(c, err, 500)
+			if errs.IsNotFoundError(err) {
+				common.ErrorPage(c, err, 404)
+			} else {
+				common.ErrorPage(c, err, 500)
+			}
 			return
 		}
 		redirect(c, link)
@@ -63,7 +70,11 @@ func Proxy(c *gin.Context) {
 			Type:   c.Query("type"),
 		})
 		if err != nil {
-			common.ErrorPage(c, err, 500)
+			if errs.IsNotFoundError(err) {
+				common.ErrorPage(c, err, 404)
+			} else {
+				common.ErrorPage(c, err, 500)
+			}
 			return
 		}
 		proxy(c, link, file, storage.GetStorage().ProxyRange)
@@ -88,6 +99,17 @@ func redirect(c *gin.Context, link *model.Link) {
 			common.ErrorPage(c, err, 500)
 			return
 		}
+	}
+	if cacheInfo := op.GetLinkCacheInfoFromLink(link); cacheInfo != nil {
+		c.Header("X-Op-Cache-Lookup", "HIT")
+		// 缓存过期时长
+		c.Header("X-Op-Cache-Expire", fmt.Sprintf("%d", int(cacheInfo.Expiration.Seconds())))
+		// 缓存有效剩余TTL
+		expTime := cacheInfo.Time.Add(cacheInfo.Expiration)
+		ttl := time.Until(expTime)
+		c.Header("X-Op-Cache-TTL", fmt.Sprintf("%d", int(ttl.Seconds())))
+	} else {
+		c.Header("X-Op-Cache-Lookup", "BYPASS")
 	}
 	c.Redirect(302, link.URL)
 }

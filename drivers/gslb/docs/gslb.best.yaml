@@ -1,0 +1,78 @@
+# GSLB 最佳实践配置
+# 详见：参考资料/GSLB负载均衡原理报告.md
+
+# ==================== 电信盘 ====================
+
+- path: /电信/1
+  asn: [4134, 4809]
+  aso: ["China Telecom", "CHINANET", "CHINATELECOM"]
+  isp: ["电信", "中国电信"]
+  country_code: ["CN"]
+  balance: true
+
+- path: /电信/2
+  asn: [4134, 4809]
+  aso: ["China Telecom", "CHINANET", "CHINATELECOM"]
+  isp: ["电信", "中国电信"]
+  country_code: ["CN"]
+  balance: true
+
+# ==================== 联通盘 ====================
+
+- path: /联通/1
+  asn: [4837, 10099]
+  aso: ["CHINA UNICOM", "China169", "China Unicom"]
+  isp: ["联通", "中国联通"]
+  country_code: ["CN"]
+  balance: true
+
+- path: /联通/2
+  asn: [4837, 10099]
+  aso: ["CHINA UNICOM", "China169", "China Unicom"]
+  isp: ["联通", "中国联通"]
+  country_code: ["CN"]
+  balance: true
+
+# ==================== 移动盘 ====================
+
+- path: /移动/1
+  asn: [9808, 58466, 56040, 56041]
+  aso: ["China Mobile", "Mobile Communication"]
+  isp: ["移动", "中国移动"]
+  country_code: ["CN"]
+  balance: true
+
+- path: /移动/2
+  asn: [9808, 58466, 56040, 56041]
+  aso: ["China Mobile", "Mobile Communication"]
+  isp: ["移动", "中国移动"]
+  country_code: ["CN"]
+  balance: true
+
+# ==================== 境内其他BGP盘 ====================
+
+- path: /境内BGP/1
+  country_code: ["CN"]
+  balance: true
+
+- path: /境内BGP/2
+  country_code: ["CN"]
+  balance: true
+
+# ==================== OneDrive国际版 ====================
+
+- path: /OneDrive国际版
+  aso: ["Microsoft"]
+  isp: ["Microsoft"]
+  country_code_not: ["CN"]
+  balance: true
+
+# ==================== 境外其他BGP盘 ====================
+
+- path: /境外BGP/1
+  country_code_not: ["CN"]
+  balance: true
+
+- path: /境外BGP/2
+  country_code_not: ["CN"]
+  balance: true
