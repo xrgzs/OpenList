@@ -122,12 +122,13 @@ func (d *Open123) Link(ctx context.Context, file model.Obj, args model.LinkArgs)
 		}, nil
 	}
 
-	res, err := d.getDownloadInfo(fileId)
+	res, err := d.GetDownloadInfo(fileId)
 	if err != nil {
 		return nil, err
 	}
 
-	return &model.Link{URL: res.Data.DownloadUrl}, nil
+	exp := 5 * time.Minute
+	return &model.Link{URL: res.Data.DownloadUrl, Expiration: &exp}, nil
 }
 
 func (d *Open123) MakeDir(ctx context.Context, parentDir model.Obj, dirName string) error {
@@ -157,7 +158,7 @@ func (d *Open123) Copy(ctx context.Context, srcObj, dstDir model.Obj) error {
 		return fmt.Errorf("parse parentFileID error: %v", err)
 	}
 	etag := srcObj.(File).Etag
-	createResp, err := d.create(parentFileId, srcObj.GetName(), etag, srcObj.GetSize(), 2, false)
+	createResp, err := d.Create(parentFileId, srcObj.GetName(), etag, srcObj.GetSize(), 2, false)
 	if err != nil {
 		return err
 	}
@@ -205,7 +206,7 @@ func (d *Open123) Put(ctx context.Context, dstDir model.Obj, file model.FileStre
 			return nil, err
 		}
 	}
-	createResp, err := d.create(parentFileId, file.GetName(), etag, file.GetSize(), 2, false)
+	createResp, err := d.Create(parentFileId, file.GetName(), etag, file.GetSize(), 2, false)
 	if err != nil {
 		return nil, err
 	}

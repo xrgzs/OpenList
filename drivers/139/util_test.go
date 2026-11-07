@@ -50,12 +50,12 @@ func TestYunClientInfoClientType(t *testing.T) {
 	}{
 		{
 			name: "default web client",
-			want: "||9|7.14.0|chrome|120.0.0.0|||windows 10||zh-CN|||dW5kZWZpbmVk||",
+			want: "||9|7.18.0|chrome|120.0.0.0|||windows 10||zh-CN|||dW5kZWZpbmVk||",
 		},
 		{
 			name:       "pc client",
 			clientType: "pc",
-			want:       "||13|7.14.0|chrome|120.0.0.0|||windows 10||zh-CN|||dW5kZWZpbmVk||",
+			want:       "||13|7.18.0|chrome|120.0.0.0|||windows 10||zh-CN|||dW5kZWZpbmVk||",
 		},
 	}
 
