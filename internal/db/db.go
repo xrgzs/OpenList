@@ -35,6 +35,8 @@ func Init(d *gorm.DB) {
 			MediaMigrateWipeEnv,
 		)
 	}
+
+	initIPDB()
 }
 
 func mediaWipeConfirmed() bool {
@@ -79,7 +81,7 @@ func migrateMediaItems() error {
 	const idx = "idx_media_folder_file_album"
 	if m.HasIndex(table, idx) {
 		// 已是新索引：仅清理软删除残留数据，避免与唯一索引冲突
-		if err := db.Exec("DELETE FROM "+quoteIdent(table)+" WHERE deleted_at IS NOT NULL").Error; err != nil {
+		if err := db.Exec("DELETE FROM " + quoteIdent(table) + " WHERE deleted_at IS NOT NULL").Error; err != nil {
 			log.Warnf("media_items: 清理软删除残留数据失败: %v", err)
 		}
 		return nil
@@ -139,4 +141,5 @@ func Close() {
 		log.Errorf("failed to close db: %s", err.Error())
 		return
 	}
+	closeIPDB()
 }
